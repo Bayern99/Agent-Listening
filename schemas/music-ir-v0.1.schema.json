@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MusicIR",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "track",
+    "global",
+    "structure",
+    "harmony",
+    "audio_features",
+    "provenance",
+    "review"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "music-ir/0.1" },
+    "track": {
+      "type": "object",
+      "required": ["id", "source_file", "duration_s", "analysis_mode"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "source_file": { "type": "string" },
+        "duration_s": { "type": "number", "minimum": 0 },
+        "analysis_mode": { "type": "string", "enum": ["full_mix", "stem", "solo"] }
+      }
+    },
+    "global": {
+      "type": "object",
+      "required": ["tempo_bpm", "key_summary", "key_candidates"],
+      "properties": {
+        "tempo_bpm": {
+          "type": "object",
+          "required": ["value"],
+          "properties": {
+            "value": { "type": ["number", "null"] },
+            "evidence": { "type": "array" }
+          }
+        },
+        "meter": { "type": "object" },
+        "key_summary": { "type": ["string", "null"] },
+        "key_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "scale", "strength", "tool", "algorithm"],
+            "properties": {
+              "key": { "type": "string" },
+              "scale": { "type": "string" },
+              "strength": { "type": "number" },
+              "tool": { "type": "string" },
+              "algorithm": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "required": ["beats_s", "downbeats_s", "sections"],
+      "properties": {
+        "beats_s": { "type": "array", "items": { "type": "number" } },
+        "downbeats_s": { "type": "array", "items": { "type": "number" } },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["start_s", "end_s", "label", "tool"],
+            "properties": {
+              "start_s": { "type": "number" },
+              "end_s": { "type": "number" },
+              "label": { "type": "string" },
+              "tool": { "type": "string" },
+              "confidence": { "type": ["number", "null"] },
+              "loudness_lufs": { "type": ["number", "null"] },
+              "spectral_centroid_hz": { "type": ["number", "null"] },
+              "dynamic_complexity": { "type": ["number", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "harmony": {
+      "type": "object",
+      "required": ["key_summary", "chord_statistics"],
+      "properties": {
+        "key_summary": { "type": ["string", "null"] },
+        "chord_statistics": { "type": "object" },
+        "time_aligned_chords": {
+          "type": "object",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "status": { "type": "string" }
+          }
+        }
+      }
+    },
+    "symbols": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "note_events_csv": { "type": ["string", "null"] },
+        "midi_file": { "type": ["string", "null"] },
+        "caveat": { "type": "string" }
+      }
+    },
+    "audio_features": {
+      "type": "object",
+      "required": ["loudness_ebu128_integrated_lufs", "dynamic_complexity", "spectral_centroid_hz_mean"],
+      "properties": {
+        "loudness_ebu128_integrated_lufs": { "type": "number" },
+        "loudness_range_lu": { "type": "number" },
+        "dynamic_complexity": { "type": "number" },
+        "spectral_centroid_hz_mean": { "type": "number" },
+        "spectral_flux_mean": { "type": "number" },
+        "onset_rate_per_s": { "type": "number" },
+        "notes": { "type": "string" }
+      }
+    },
+    "interpretation": {
+      "type": "object",
+      "properties": {
+        "manual_notes": { "type": "array" },
+        "derived_summary": { "type": "object" },
+        "synthesis_hints": { "type": "object" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["allin1", "essentia", "created_at"],
+      "properties": {
+        "allin1": { "type": "object" },
+        "essentia": { "type": "object" },
+        "basic_pitch": { "type": "object" },
+        "created_at": { "type": "string" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["human_checked"],
+      "properties": {
+        "human_checked": { "type": "boolean" },
+        "known_uncertainties": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

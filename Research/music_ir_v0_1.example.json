@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "music-ir/0.1",
+  "track": {
+    "id": "my-track-001",
+    "title": "可选：作品名",
+    "source_file": "source/my-track-001.wav",
+    "duration_s": 183.42,
+    "analysis_mode": "full_mix"
+  },
+  "global": {
+    "tempo_bpm": {
+      "value": 84.2,
+      "evidence": [{"tool": "allin1", "field": "bpm"}]
+    },
+    "meter": {"value": null, "status": "not_inferred_in_v0_1"},
+    "key_candidates": [
+      {"key": "D", "scale": "minor", "strength": 0.88, "tool": "essentia", "field": "tonal.key_edma"}
+    ]
+  },
+  "structure": {
+    "beats_s": [0.45, 1.16, 1.88],
+    "downbeats_s": [0.45, 3.30, 6.16],
+    "sections": [
+      {"start_s": 0.0, "end_s": 17.2, "label": "intro", "tool": "allin1", "confidence": null},
+      {"start_s": 17.2, "end_s": 48.7, "label": "verse", "tool": "allin1", "confidence": null}
+    ]
+  },
+  "harmony": {
+    "key_summary": "D minor",
+    "chord_statistics": {
+      "histogram": {},
+      "changes_rate": null,
+      "source": "essentia"
+    },
+    "time_aligned_chords": {
+      "enabled": false,
+      "status": "optional_chordino_or_other_aligner_required"
+    }
+  },
+  "symbols": {
+    "enabled": false,
+    "note_events_csv": null,
+    "midi_file": null,
+    "caveat": "仅在独奏素材或明确需要旋律/音符骨架时启用 Basic Pitch；混音结果不是完整乐谱真值。"
+  },
+  "audio_features": {
+    "loudness_ebu128_integrated_lufs": -13.4,
+    "loudness_range_lu": 7.8,
+    "dynamic_complexity": 2.6,
+    "spectral_centroid_hz_mean": 1546.6,
+    "spectral_flux_mean": 0.1068,
+    "onset_rate_per_s": 1.2,
+    "notes": "数值来自 Essentia 的汇总 JSON；若比较不同作品，需保持相同版本与 profile。"
+  },
+  "interpretation": {
+    "manual_notes": [],
+    "derived_summary": {
+      "enabled": false,
+      "rule": "只能基于上述 evidence 和人工笔记生成；不得将生成式描述写回为事实。"
+    },
+    "supercollider_hints": {
+      "enabled": false,
+      "notes": "属于下一阶段的映射层，不在 V0.1 从音频自动推断。"
+    }
+  },
+  "provenance": {
+    "allin1": {"version": "pin in lockfile", "raw_json": "raw/allin1.json"},
+    "essentia": {"version": "pin in lockfile", "profile": "profiles/essentia_v0_1.yaml", "raw_json": "raw/essentia.json"},
+    "basic_pitch": {"enabled": false, "version": null, "note_events_csv": null},
+    "created_at": "YYYY-MM-DDTHH:MM:SSZ"
+  },
+  "review": {
+    "human_checked": false,
+    "known_uncertainties": [
+      "段落标签、调性和节拍均是模型/算法的候选结论，需要听觉复核。",
+      "完整混音上不默认启用音符转录。"
+    ]
+  }
+}

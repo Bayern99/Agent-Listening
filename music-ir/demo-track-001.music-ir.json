@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "music-ir/0.1",
+  "track": {
+    "id": "demo-track-001",
+    "title": "demo-track-001",
+    "source_file": "source/demo-track-001.wav",
+    "duration_s": 183.42,
+    "analysis_mode": "full_mix"
+  },
+  "global": {
+    "tempo_bpm": {
+      "value": 84.0,
+      "evidence": [
+        {
+          "tool": "allin1",
+          "field": "bpm",
+          "value": 84.0
+        },
+        {
+          "tool": "essentia",
+          "field": "rhythm.bpm",
+          "value": 84.2
+        }
+      ]
+    },
+    "meter": {
+      "value": null,
+      "status": "not_inferred_in_v0_1"
+    },
+    "key_summary": "D minor",
+    "key_candidates": [
+      {
+        "algorithm": "edma",
+        "key": "D",
+        "scale": "minor",
+        "strength": 0.88,
+        "tool": "essentia"
+      },
+      {
+        "algorithm": "temperley",
+        "key": "D",
+        "scale": "minor",
+        "strength": 0.79,
+        "tool": "essentia"
+      },
+      {
+        "algorithm": "krumhansl",
+        "key": "F",
+        "scale": "major",
+        "strength": 0.65,
+        "tool": "essentia"
+      }
+    ]
+  },
+  "structure": {
+    "beats_s": [
+      0.45,
+      1.16,
+      1.88,
+      2.59,
+      3.3,
+      4.01,
+      4.73,
+      5.44,
+      6.16
+    ],
+    "downbeats_s": [
+      0.45,
+      3.3,
+      6.16
+    ],
+    "sections": [
+      {
+        "start_s": 0.0,
+        "end_s": 17.2,
+        "label": "intro",
+        "tool": "allin1",
+        "confidence": null,
+        "loudness_lufs": -20.0,
+        "spectral_centroid_hz": 1025.0,
+        "dynamic_complexity": 2.0
+      },
+      {
+        "start_s": 17.2,
+        "end_s": 48.7,
+        "label": "verse",
+        "tool": "allin1",
+        "confidence": null,
+        "loudness_lufs": -14.0,
+        "spectral_centroid_hz": 1450.0,
+        "dynamic_complexity": 2.6
+      },
+      {
+        "start_s": 48.7,
+        "end_s": 78.1,
+        "label": "chorus",
+        "tool": "allin1",
+        "confidence": null,
+        "loudness_lufs": -11.5,
+        "spectral_centroid_hz": 1850.0,
+        "dynamic_complexity": 2.6
+      },
+      {
+        "start_s": 78.1,
+        "end_s": 110.4,
+        "label": "verse",
+        "tool": "allin1",
+        "confidence": null,
+        "loudness_lufs": -12.0,
+        "spectral_centroid_hz": 1920.0,
+        "dynamic_complexity": 2.6
+      },
+      {
+        "start_s": 110.4,
+        "end_s": 183.42,
+        "label": "outro",
+        "tool": "allin1",
+        "confidence": null,
+        "loudness_lufs": -16.17,
+        "spectral_centroid_hz": 1293.33,
+        "dynamic_complexity": 2.78
+      }
+    ]
+  },
+  "harmony": {
+    "key_summary": "D minor",
+    "chord_statistics": {
+      "histogram": {
+        "Dm": 0.45,
+        "Bb": 0.3,
+        "Gm": 0.25
+      },
+      "changes_rate": 0.35,
+      "source": "essentia"
+    },
+    "time_aligned_chords": {
+      "enabled": false,
+      "status": "optional_chordino_or_other_aligner_required"
+    }
+  },
+  "symbols": {
+    "enabled": false,
+    "note_events_csv": null,
+    "midi_file": null,
+    "caveat": "Disabled by default for full mix audio (ADR-0007)."
+  },
+  "audio_features": {
+    "loudness_ebu128_integrated_lufs": -13.4,
+    "loudness_range_lu": 7.8,
+    "dynamic_complexity": 2.6,
+    "spectral_centroid_hz_mean": 1546.6,
+    "spectral_flux_mean": 0.1068,
+    "onset_rate_per_s": 1.2,
+    "notes": "Extracted via Essentia profile 'essentia_v0_1'. Cross-track comparisons require identical profile."
+  },
+  "interpretation": {
+    "manual_notes": [],
+    "derived_summary": {
+      "enabled": false,
+      "rule": "Can only be generated from evidence and manual notes (ADR-0004)."
+    },
+    "synthesis_hints": {
+      "enabled": false,
+      "notes": "Synthesis mapping delegated to downstream agent (ADR-0004)."
+    }
+  },
+  "provenance": {
+    "allin1": {
+      "version": "unknown",
+      "raw_json": "tests/fixtures/allin1_sample.json"
+    },
+    "essentia": {
+      "version": "2.1-beta6-git",
+      "profile": "profiles/essentia_v0_1.yaml",
+      "raw_json": "tests/fixtures/essentia_sample.json"
+    },
+    "basic_pitch": {
+      "enabled": false,
+      "version": null,
+      "note_events_csv": null
+    },
+    "created_at": "2026-08-22T16:43:14.228647+00:00"
+  },
+  "review": {
+    "human_checked": false,
+    "known_uncertainties": [
+      "Segment boundaries and key candidates require auditory verification.",
+      "Symbolic transcription disabled by default for full mix."
+    ]
+  }
+}

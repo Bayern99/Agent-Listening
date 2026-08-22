@@ -1,0 +1,37 @@
+# Essentia Analysis Profile v0.1
+# Standard configuration for audio-to-music-ir extraction
+
+profile_name: "essentia_v0_1"
+version: "0.1"
+
+lowlevel:
+  frameSize: 2048
+  hopSize: 1024
+  sampleRate: 44100
+  windowType: "blackmanharris62"
+  stats: ["mean", "var", "stdev"]
+  spectral_descriptors:
+    - "spectral_centroid"
+    - "spectral_flux"
+    - "spectral_rolloff"
+    - "spectral_energy"
+
+tonal:
+  frameSize: 4096
+  hopSize: 2048
+  profiles: ["edma", "temperley", "krumhansl"]
+
+rhythm:
+  method: "multifeature"
+  minBpm: 40
+  maxBpm: 240
+
+loudness:
+  standard: "ebu128"
+  integrated: true
+  range: true
+
+output:
+  format: "json"
+  aggregate: true
+  frameFeatures: true

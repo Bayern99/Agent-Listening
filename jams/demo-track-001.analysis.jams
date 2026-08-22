@@ -1,0 +1,211 @@
+{
+  "file_metadata": {
+    "title": "demo-track-001",
+    "artist": "",
+    "release": "",
+    "duration": 183.42,
+    "identifiers": {
+      "track_id": "demo-track-001"
+    },
+    "jams_version": "0.3.4"
+  },
+  "annotations": [
+    {
+      "namespace": "segment_open",
+      "annotation_metadata": {
+        "curator": {
+          "name": "allin1",
+          "email": ""
+        },
+        "data_source": "allin1 structure analysis"
+      },
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 17.2,
+          "value": "intro"
+        },
+        {
+          "time": 17.2,
+          "duration": 31.5,
+          "value": "verse"
+        },
+        {
+          "time": 48.7,
+          "duration": 29.4,
+          "value": "chorus"
+        },
+        {
+          "time": 78.1,
+          "duration": 32.3,
+          "value": "verse"
+        },
+        {
+          "time": 110.4,
+          "duration": 73.02,
+          "value": "outro"
+        }
+      ]
+    },
+    {
+      "namespace": "beat",
+      "annotation_metadata": {
+        "curator": {
+          "name": "allin1",
+          "email": ""
+        },
+        "data_source": "allin1 beat tracking"
+      },
+      "data": [
+        {
+          "time": 0.45,
+          "duration": 0.0,
+          "value": 1
+        },
+        {
+          "time": 1.16,
+          "duration": 0.0,
+          "value": 2
+        },
+        {
+          "time": 1.88,
+          "duration": 0.0,
+          "value": 3
+        },
+        {
+          "time": 2.59,
+          "duration": 0.0,
+          "value": 4
+        },
+        {
+          "time": 3.3,
+          "duration": 0.0,
+          "value": 5
+        },
+        {
+          "time": 4.01,
+          "duration": 0.0,
+          "value": 6
+        },
+        {
+          "time": 4.73,
+          "duration": 0.0,
+          "value": 7
+        },
+        {
+          "time": 5.44,
+          "duration": 0.0,
+          "value": 8
+        },
+        {
+          "time": 6.16,
+          "duration": 0.0,
+          "value": 9
+        }
+      ]
+    },
+    {
+      "namespace": "tempo",
+      "annotation_metadata": {
+        "curator": {
+          "name": "allin1/essentia",
+          "email": ""
+        },
+        "data_source": "tempo estimation"
+      },
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": 84.0
+        }
+      ]
+    },
+    {
+      "namespace": "key_mode",
+      "annotation_metadata": {
+        "curator": {
+          "name": "essentia",
+          "email": ""
+        },
+        "data_source": "essentia key estimation"
+      },
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": "D minor",
+          "confidence": 0.88
+        },
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": "D minor",
+          "confidence": 0.79
+        },
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": "F major",
+          "confidence": 0.65
+        }
+      ]
+    },
+    {
+      "namespace": "loudness",
+      "annotation_metadata": {
+        "curator": {
+          "name": "essentia",
+          "email": ""
+        },
+        "data_source": "essentia frame-level loudness"
+      },
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 0.0,
+          "value": -22.0
+        },
+        {
+          "time": 10.0,
+          "duration": 0.0,
+          "value": -18.0
+        },
+        {
+          "time": 20.0,
+          "duration": 0.0,
+          "value": -14.0
+        },
+        {
+          "time": 50.0,
+          "duration": 0.0,
+          "value": -11.5
+        },
+        {
+          "time": 80.0,
+          "duration": 0.0,
+          "value": -12.0
+        },
+        {
+          "time": 120.0,
+          "duration": 0.0,
+          "value": -13.5
+        },
+        {
+          "time": 150.0,
+          "duration": 0.0,
+          "value": -15.0
+        },
+        {
+          "time": 180.0,
+          "duration": 0.0,
+          "value": -20.0
+        }
+      ]
+    }
+  ],
+  "sandbox": {
+    "allin1_version": "unknown",
+    "essentia_version": "2.1-beta6-git"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "bpm": 84.0,
+  "beats": [0.45, 1.16, 1.88, 2.59, 3.30, 4.01, 4.73, 5.44, 6.16],
+  "downbeats": [0.45, 3.30, 6.16],
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 17.2,
+      "label": "intro"
+    },
+    {
+      "start": 17.2,
+      "end": 48.7,
+      "label": "verse"
+    },
+    {
+      "start": 48.7,
+      "end": 78.1,
+      "label": "chorus"
+    },
+    {
+      "start": 78.1,
+      "end": 110.4,
+      "label": "verse"
+    },
+    {
+      "start": 110.4,
+      "end": 183.42,
+      "label": "outro"
+    }
+  ]
+}
