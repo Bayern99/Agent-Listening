@@ -6,9 +6,9 @@ Welcome to **Agent Listening** (Audio-to-Music-IR). This project converts finish
 
 ## Agent Skills
 
-### Issue Tracker
+### Issue tracker
 
-Issues and tracer-bullet specs are tracked as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+Issues and tracer-bullet specs are tracked via GitHub Issues (`gh`). See `docs/agents/issue-tracker.md`.
 
 ### Triage Labels
 
