@@ -15,6 +15,16 @@ Python 3.11 and [uv](https://docs.astral.sh/uv/) are required.
 uv sync
 ```
 
+## Local agent integration
+
+From the repository root, expose the versioned command and Skill through the
+local agent paths (create each link only when its target is absent):
+
+```bash
+ln -s "$(pwd)/bin/agent-listening" "$HOME/.local/bin/agent-listening"
+ln -s "$(pwd)/.agents/skills/agent-listening" "$HOME/.agents/skills/agent-listening"
+```
+
 ## Commands
 
 Build artifacts from captured extractor JSON:
