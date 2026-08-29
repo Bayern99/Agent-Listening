@@ -5,7 +5,10 @@ Pure deterministic transformation functions that merge multi-extractor evidence 
 2. `MusicIR` JSON dict (conforming to schemas/music-ir-v0.1.schema.json).
 """
 
+import json
 from typing import Any, Dict, List, Optional, Tuple
+
+import jams as jams_library
 
 from src.adapters.allin1_adapter import AllInOneEvidence
 from src.adapters.essentia_adapter import EssentiaEvidence
@@ -25,24 +28,14 @@ def _aggregate_section_acoustics(
     loudness_frames = frame_features.get("loudness_lufs", [])
     centroid_frames = frame_features.get("spectral_centroid_hz", [])
 
-    if not timestamps or not loudness_frames or not centroid_frames:
-        # Fallback to global characteristics if frame curves not provided
+    if not timestamps or len(timestamps) != len(loudness_frames) or len(timestamps) != len(centroid_frames):
         return round(global_loudness, 2), round(global_centroid, 2), round(global_complexity, 2)
 
-    sliced_loudness = []
-    sliced_centroids = []
-
-    for t, l, c in zip(timestamps, loudness_frames, centroid_frames):
-        if start_s <= t <= end_s:
-            sliced_loudness.append(l)
-            sliced_centroids.append(c)
-
-    if not sliced_loudness:
-        # Interpolate closest point
-        closest_idx = min(range(len(timestamps)), key=lambda i: abs(timestamps[i] - (start_s + end_s) / 2.0))
-        sliced_loudness = [loudness_frames[closest_idx]]
-        sliced_centroids = [centroid_frames[closest_idx]]
-
+    indices = [index for index, timestamp in enumerate(timestamps) if start_s <= timestamp <= end_s]
+    if not indices:
+        indices = [min(range(len(timestamps)), key=lambda index: abs(timestamps[index] - (start_s + end_s) / 2.0))]
+    sliced_loudness = [loudness_frames[index] for index in indices]
+    sliced_centroids = [centroid_frames[index] for index in indices]
     sec_loudness = sum(sliced_loudness) / len(sliced_loudness)
     sec_centroid = sum(sliced_centroids) / len(sliced_centroids)
 
@@ -64,11 +57,11 @@ def build_music_ir(
     essentia_evidence: Optional[EssentiaEvidence] = None,
     analysis_mode: str = "full_mix",
     profile_name: str = "essentia_v0_1",
-    enable_symbols: bool = False,
     raw_paths: Optional[Dict[str, str]] = None,
     title: Optional[str] = None,
     created_at: str = "1970-01-01T00:00:00Z",
     schema: Optional[Dict[str, Any]] = None,
+    source_sha256: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Pure, deterministic fusion of evidence into a validated Music IR dictionary."""
     if allin1_evidence is None:
@@ -95,6 +88,7 @@ def build_music_ir(
             key_summary = f"{winner['key']} {winner['scale']}"
 
     # 3. Structure & Sections with REAL inline acoustic aggregation (ADR-0008, ADR-0005)
+    dur_rounded = round(duration_s, 2)
     sections = []
     for sec in allin1_evidence.sections:
         sec_loudness, sec_centroid, sec_complexity = _aggregate_section_acoustics(
@@ -115,6 +109,9 @@ def build_music_ir(
             "spectral_centroid_hz": sec_centroid,
             "dynamic_complexity": sec_complexity,
         })
+    if sections:
+        sections[0]["start_s"] = 0.0
+        sections[-1]["end_s"] = dur_rounded
 
     # 4. Audio features summary (ADR-0005)
     audio_features = {
@@ -127,16 +124,7 @@ def build_music_ir(
         "notes": f"Extracted via Essentia profile '{profile_name}'. Cross-track comparisons require identical profile.",
     }
 
-    # 5. Symbols opt-in logic (ADR-0007)
-    symbols_active = enable_symbols or analysis_mode == "solo"
-    symbols_dict = {
-        "enabled": symbols_active,
-        "note_events_csv": f"raw/{track_id}.notes.csv" if symbols_active else None,
-        "midi_file": f"raw/{track_id}.mid" if symbols_active else None,
-        "caveat": "Enabled for solo tracks / explicit opt-in." if symbols_active else "Disabled by default for full mix audio (ADR-0007).",
-    }
-
-    # 6. Provenance
+    # 5. Provenance
     provenance = {
         "allin1": {
             "version": allin1_evidence.tool_version,
@@ -147,16 +135,18 @@ def build_music_ir(
             "profile": f"profiles/{profile_name}.yaml",
             "raw_json": raw_paths.get("essentia", f"raw/{track_id}/essentia.json"),
         },
-        "basic_pitch": {
-            "enabled": symbols_active,
-            "version": "0.2.0" if symbols_active else None,
-            "note_events_csv": symbols_dict["note_events_csv"],
-        },
         "created_at": created_at,
     }
+    if allin1_evidence.raw_sha256:
+        provenance["allin1"]["raw_sha256"] = allin1_evidence.raw_sha256
+    if essentia_evidence.raw_sha256:
+        provenance["essentia"]["raw_sha256"] = essentia_evidence.raw_sha256
+    if essentia_evidence.profile_sha256:
+        provenance["essentia"]["profile_sha256"] = essentia_evidence.profile_sha256
+    if source_sha256:
+        provenance["source"] = {"sha256": source_sha256}
 
     music_ir = {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "schema_version": "music-ir/0.1",
         "track": {
             "id": track_id,
@@ -190,7 +180,6 @@ def build_music_ir(
                 "status": "optional_chordino_or_other_aligner_required",
             },
         },
-        "symbols": symbols_dict,
         "audio_features": audio_features,
         "interpretation": {
             "manual_notes": [],
@@ -208,7 +197,6 @@ def build_music_ir(
             "human_checked": False,
             "known_uncertainties": [
                 "Segment boundaries and key candidates require auditory verification.",
-                "Symbolic transcription disabled by default for full mix.",
             ],
         },
     }
@@ -223,118 +211,141 @@ def build_jams(
     duration_s: float,
     allin1_evidence: Optional[AllInOneEvidence] = None,
     essentia_evidence: Optional[EssentiaEvidence] = None,
+    source_file: Optional[str] = None,
+    raw_paths: Optional[Dict[str, str]] = None,
+    created_at: Optional[str] = None,
+    source_sha256: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Pure, deterministic construction of standard JAMS time-series annotation dictionary."""
+    """Build a JAMS document and validate the official base schema."""
     if allin1_evidence is None:
         allin1_evidence = AllInOneEvidence()
     if essentia_evidence is None:
         essentia_evidence = EssentiaEvidence()
+    raw_paths = raw_paths or {}
 
-    annotations = []
+    jam = jams_library.JAMS()
+    jam.file_metadata.title = track_id
+    jam.file_metadata.duration = round(duration_s, 2)
+    jam.file_metadata.identifiers = {"track_id": track_id}
 
-    # 1. Section annotation (segment_open namespace) - NO confidence fabrication!
     if allin1_evidence.sections:
-        sec_data = []
+        annotation = jams_library.Annotation(
+            namespace="segment_open",
+            time=0,
+            duration=duration_s,
+            annotation_metadata=jams_library.AnnotationMetadata(
+                data_source="program",
+                annotator={"tool": "allin1", "version": allin1_evidence.tool_version},
+            ),
+        )
         for sec in allin1_evidence.sections:
-            entry = {
-                "time": sec["start_s"],
-                "duration": round(sec["end_s"] - sec["start_s"], 3),
-                "value": sec["label"],
-            }
-            # Only include confidence if actually present, do not fabricate 1.0
-            if sec.get("confidence") is not None:
-                entry["confidence"] = float(sec["confidence"])
-            sec_data.append(entry)
+            annotation.append(
+                time=sec["start_s"],
+                duration=round(sec["end_s"] - sec["start_s"], 3),
+                value=sec["label"],
+                confidence=sec.get("confidence"),
+            )
+        jam.annotations.append(annotation)
 
-        annotations.append({
-            "namespace": "segment_open",
-            "annotation_metadata": {
-                "curator": {"name": "allin1", "email": ""},
-                "data_source": "allin1 structure analysis",
-            },
-            "data": sec_data,
-        })
-
-    # 2. Beat annotation (beat namespace)
     if allin1_evidence.beats_s:
-        beat_data = [
-            {"time": b, "duration": 0.0, "value": idx + 1}
-            for idx, b in enumerate(allin1_evidence.beats_s)
-        ]
-        annotations.append({
-            "namespace": "beat",
-            "annotation_metadata": {
-                "curator": {"name": "allin1", "email": ""},
-                "data_source": "allin1 beat tracking",
-            },
-            "data": beat_data,
-        })
+        positions: List[Optional[int]] = list(allin1_evidence.beat_positions)
+        if not positions:
+            positions = [
+                1 if any(abs(beat - downbeat) < 1e-6 for downbeat in allin1_evidence.downbeats_s) else None
+                for beat in allin1_evidence.beats_s
+            ]
+        annotation = jams_library.Annotation(
+            namespace="beat",
+            time=0,
+            duration=duration_s,
+            annotation_metadata=jams_library.AnnotationMetadata(
+                data_source="program",
+                annotator={"tool": "allin1", "version": allin1_evidence.tool_version},
+            ),
+        )
+        for beat, position in zip(allin1_evidence.beats_s, positions):
+            annotation.append(time=beat, duration=0.0, value=position, confidence=None)
+        jam.annotations.append(annotation)
 
-    # 3. Tempo annotation
     tempo_val = allin1_evidence.tempo_bpm or essentia_evidence.bpm
     if tempo_val:
-        annotations.append({
-            "namespace": "tempo",
-            "annotation_metadata": {
-                "curator": {"name": "allin1/essentia", "email": ""},
-                "data_source": "tempo estimation",
-            },
-            "data": [{"time": 0.0, "duration": duration_s, "value": tempo_val}],
-        })
+        tempo_tool = "allin1" if allin1_evidence.tempo_bpm is not None else "essentia"
+        tempo_version = allin1_evidence.tool_version if tempo_tool == "allin1" else essentia_evidence.tool_version
+        annotation = jams_library.Annotation(
+            namespace="tempo",
+            time=0,
+            duration=duration_s,
+            annotation_metadata=jams_library.AnnotationMetadata(
+                data_source="program",
+                annotator={"tool": tempo_tool, "version": tempo_version},
+            ),
+        )
+        annotation.append(time=0.0, duration=duration_s, value=tempo_val, confidence=None)
+        jam.annotations.append(annotation)
 
-    # 4. Key candidate annotations (key_mode namespace)
     if essentia_evidence.key_candidates:
-        key_data = [
-            {
-                "time": 0.0,
-                "duration": duration_s,
-                "value": f"{c['key']} {c['scale']}",
-                "confidence": c["strength"],
-            }
-            for c in essentia_evidence.key_candidates
-            if c.get("key") and c.get("scale")
-        ]
-        annotations.append({
-            "namespace": "key_mode",
-            "annotation_metadata": {
-                "curator": {"name": "essentia", "email": ""},
-                "data_source": "essentia key estimation",
-            },
-            "data": key_data,
-        })
+        annotation = jams_library.Annotation(
+            namespace="key_mode",
+            time=0,
+            duration=duration_s,
+            annotation_metadata=jams_library.AnnotationMetadata(
+                data_source="program",
+                annotator={"tool": "essentia", "version": essentia_evidence.tool_version},
+            ),
+        )
+        for candidate in essentia_evidence.key_candidates:
+            if candidate.get("key") and candidate.get("scale"):
+                annotation.append(
+                    time=0.0,
+                    duration=duration_s,
+                    value=f"{candidate['key']}:{candidate['scale']}",
+                    confidence=candidate["strength"],
+                )
+        jam.annotations.append(annotation)
 
-    # 5. Continuous frame curves in JAMS (ADR-0005)
     frame_features = essentia_evidence.frame_features
-    if frame_features.get("timestamps_s"):
-        loudness_data = [
-            {"time": t, "duration": 0.0, "value": l}
-            for t, l in zip(frame_features["timestamps_s"], frame_features.get("loudness_lufs", []))
-        ]
-        if loudness_data:
-            annotations.append({
-                "namespace": "loudness",
-                "annotation_metadata": {
-                    "curator": {"name": "essentia", "email": ""},
-                    "data_source": "essentia frame-level loudness",
-                },
-                "data": loudness_data,
-            })
+    columns = ["loudness_lufs", "spectral_centroid_hz", "spectral_flux"]
+    vectors = [frame_features.get(name, []) for name in columns]
+    timestamps = frame_features.get("timestamps_s", [])
+    if timestamps and all(vectors):
+        lengths = {len(timestamps), *(len(values) for values in vectors)}
+        if len(lengths) != 1:
+            raise ValueError("Essentia frame feature arrays must have equal lengths")
+        annotation = jams_library.Annotation(
+            namespace="vector",
+            time=0,
+            duration=duration_s,
+            annotation_metadata=jams_library.AnnotationMetadata(
+                data_source="program",
+                annotator={"tool": "essentia", "version": essentia_evidence.tool_version},
+            ),
+            sandbox={"columns": columns},
+        )
+        for index, timestamp in enumerate(timestamps):
+            annotation.append(
+                time=timestamp,
+                duration=0.0,
+                value=[values[index] for values in vectors],
+                confidence=None,
+            )
+        jam.annotations.append(annotation)
 
-    return {
-        "file_metadata": {
-            "title": track_id,
-            "artist": "",
-            "release": "",
-            "duration": round(duration_s, 2),
-            "identifiers": {"track_id": track_id},
-            "jams_version": "0.3.4",
-        },
-        "annotations": annotations,
-        "sandbox": {
-            "allin1_version": allin1_evidence.tool_version,
-            "essentia_version": essentia_evidence.tool_version,
-        },
+    jam.sandbox = {
+        "allin1_version": allin1_evidence.tool_version,
+        "essentia_version": essentia_evidence.tool_version,
+        "allin1_raw_json": raw_paths.get("allin1"),
+        "essentia_raw_json": raw_paths.get("essentia"),
+        "allin1_raw_sha256": allin1_evidence.raw_sha256,
+        "essentia_raw_sha256": essentia_evidence.raw_sha256,
+        "essentia_profile_sha256": essentia_evidence.profile_sha256,
+        "source_file": source_file,
+        "source_sha256": source_sha256,
+        "created_at": created_at,
     }
+    jam.sandbox["validation"] = "jams_schema; namespace confidence unavailable"
+    document = json.loads(jam.dumps())
+    jams_library.schema.VALIDATOR.validate(document)
+    return document
 
 
 def merge_evidence(
@@ -345,11 +356,11 @@ def merge_evidence(
     duration_s: Optional[float] = None,
     analysis_mode: str = "full_mix",
     profile_name: str = "essentia_v0_1",
-    enable_symbols: bool = False,
     raw_paths: Optional[Dict[str, str]] = None,
     title: Optional[str] = None,
     created_at: str = "1970-01-01T00:00:00Z",
     schema: Optional[Dict[str, Any]] = None,
+    source_sha256: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Pure functional fusion: (allin1, essentia) -> (JAMS, MusicIR)."""
     if duration_s is None:
@@ -365,16 +376,20 @@ def merge_evidence(
         essentia_evidence=essentia_evidence,
         analysis_mode=analysis_mode,
         profile_name=profile_name,
-        enable_symbols=enable_symbols,
         raw_paths=raw_paths,
         title=title,
         created_at=created_at,
         schema=schema,
+        source_sha256=source_sha256,
     )
     jams = build_jams(
         track_id=track_id,
         duration_s=duration_s,
         allin1_evidence=allin1_evidence,
         essentia_evidence=essentia_evidence,
+        source_file=source_file,
+        raw_paths=raw_paths,
+        created_at=created_at,
+        source_sha256=source_sha256,
     )
     return jams, music_ir

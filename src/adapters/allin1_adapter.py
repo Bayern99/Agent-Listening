@@ -4,6 +4,7 @@ Handles running allin1 CLI / python library and parsing BPM, beat grid, and sect
 """
 
 from dataclasses import dataclass, field
+from importlib.metadata import PackageNotFoundError, version
 import json
 from pathlib import Path
 import shutil
@@ -16,9 +17,11 @@ class AllInOneEvidence:
     duration_s: float = 0.0
     tempo_bpm: Optional[float] = None
     beats_s: List[float] = field(default_factory=list)
+    beat_positions: List[int] = field(default_factory=list)
     downbeats_s: List[float] = field(default_factory=list)
     sections: List[Dict[str, Any]] = field(default_factory=list)
     tool_version: str = "unknown"
+    raw_sha256: Optional[str] = None
 
 
 class AllInOneAdapter:
@@ -49,11 +52,14 @@ class AllInOneAdapter:
         """Run allin1 analysis on audio file and save output JSON."""
         # 1. Try direct python API (allin1_infer or allin1)
         allin1_mod = None
+        distribution = None
         try:
             import allin1_infer as allin1_mod  # noqa: F401
+            distribution = "all-in-one-infer"
         except Exception:
             try:
                 import allin1 as allin1_mod  # noqa: F401
+                distribution = "allin1"
             except Exception:
                 pass
 
@@ -69,12 +75,19 @@ class AllInOneAdapter:
             ]
             duration_s = segments[-1]["end"] if segments else 0.0
             data = {
+                "path": str(getattr(result, "path", audio_path)),
                 "bpm": getattr(result, "bpm", None),
                 "beats": [float(b) for b in getattr(result, "beats", [])],
+                "beat_positions": [int(p) for p in getattr(result, "beat_positions", [])],
                 "downbeats": [float(db) for db in getattr(result, "downbeats", [])],
                 "segments": segments,
                 "duration": duration_s,
+                "activation_fps": getattr(result, "activation_fps", None),
             }
+            try:
+                data["version"] = version(distribution) if distribution else "unknown"
+            except PackageNotFoundError:
+                data["version"] = "unknown"
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             return data
@@ -108,6 +121,9 @@ class AllInOneAdapter:
 
         raw_beats = raw_data.get("beats", [])
         beats_s = [float(b) for b in raw_beats]
+        beat_positions = [int(p) for p in raw_data.get("beat_positions", [])]
+        if beat_positions and len(beat_positions) != len(beats_s):
+            raise ValueError("allin1 beat_positions must align with beats")
 
         raw_downbeats = raw_data.get("downbeats", [])
         downbeats_s = [float(db) for db in raw_downbeats]
@@ -139,6 +155,7 @@ class AllInOneAdapter:
             duration_s=duration_s,
             tempo_bpm=tempo_bpm,
             beats_s=beats_s,
+            beat_positions=beat_positions,
             downbeats_s=downbeats_s,
             sections=sections,
             tool_version=tool_version,

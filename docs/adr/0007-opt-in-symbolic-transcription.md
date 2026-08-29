@@ -1,3 +1,3 @@
-# 0007. Explicit Opt-In Policy for Symbolic Transcription on Full Mixes
+# 0007. Defer Symbolic Transcription Until It Has a Real Adapter
 
-We decided that automatic music transcription (AMT / MIDI generation via Basic Pitch) will be disabled by default for full-mix recordings (`analysis_mode: full_mix`), because polyphonic multi-instrument mix transcription generates severe ghost-note artifacts. Symbol extraction can only be enabled via explicit flag `--enable-symbols` or for solo tracks (`analysis_mode: solo`).
+We decided that V0.1 will not expose symbolic-transcription flags or artifact paths. A later Basic Pitch integration must run a real adapter, record its actual version, validate its MIDI/CSV outputs, and remain opt-in for full mixes.

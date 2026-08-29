@@ -11,7 +11,7 @@ Every audio track processed by the pipeline produces two complementary artifacts
 | Artifact | File Name | Target Consumer | Primary Role |
 | :--- | :--- | :--- | :--- |
 | **Music IR** | `<track-id>.music-ir.json` | Downstream Multimodal Agents / Synthesis Systems | **Domain-aligned, concise (<10KB) structural representation** for high-level musical reasoning and parametric control. |
-| **JAMS Archive** | `<track-id>.analysis.jams` | Audio Researchers / Verification Tools | **Immutable time-series evidence archive** preserving all raw observations, multi-candidate hypotheses, and tool provenance. |
+| **JAMS Archive** | `<track-id>.analysis.jams` | Audio Researchers / Verification Tools | **Schema-validated time-series evidence** preserving timing observations, frame vectors, multi-candidate hypotheses, and tool provenance. |
 
 ---
 
@@ -114,7 +114,7 @@ Every audio track processed by the pipeline produces two complementary artifacts
 }
 ```
 
-- **`chord_statistics.histogram`**: Global distribution of detected pitch chroma triad activations.
+- **`chord_statistics.histogram`**: Essentia's normalized chord histogram, preserved as the extractor emits it (typically a numeric array; fixture data may use a labeled object).
 - **`chord_statistics.changes_rate`**: Harmonic rhythm speed (approximate chord transitions per second).
 - **`time_aligned_chords.enabled`**: Set to `false` in V0.1 ([ADR-0006](file:///Users/dmus/Transverse%20Sound%20Lab/Agent%20Listening/docs/adr/0006-harmony-key-commitment.md)).
 
@@ -145,27 +145,12 @@ Every audio track processed by the pipeline produces two complementary artifacts
 
 ---
 
-### 2.6 Symbols / Transcription (`symbols`)
-
-```json
-"symbols": {
-  "enabled": false,
-  "note_events_csv": null,
-  "midi_file": null,
-  "caveat": "Disabled by default for full mix audio (ADR-0007)."
-}
-```
-
-- **`enabled`** (`boolean`): Disabled by default for full mixes to prevent ghost-note pollution ([ADR-0007](file:///Users/dmus/Transverse%20Sound%20Lab/Agent%20Listening/docs/adr/0007-opt-in-symbolic-transcription.md)). Enabled only for solo instrumental inputs.
-
----
-
-### 2.7 Interpretation & Hints (`interpretation`)
+### 2.6 Interpretation & Hints (`interpretation`)
 
 ```json
 "interpretation": {
   "manual_notes": [],
-  "derived_summary": {"enabled": false},
+  "derived_summary": {"enabled": false, "rule": "Can only be generated from evidence and manual notes (ADR-0004)."},
   "synthesis_hints": {
     "enabled": false,
     "notes": "Synthesis mapping delegated to downstream agent (ADR-0004)."
@@ -177,12 +162,13 @@ Every audio track processed by the pipeline produces two complementary artifacts
 
 ---
 
-### 2.8 Provenance & Review (`provenance`, `review`)
+### 2.7 Provenance & Review (`provenance`, `review`)
 
 ```json
 "provenance": {
-  "allin1": {"version": "0.1.0", "raw_json": "raw/allin1.json"},
-  "essentia": {"version": "2.1-beta6-git", "profile": "profiles/essentia_v0_1.yaml", "raw_json": "raw/essentia.json"},
+  "source": {"sha256": "..."},
+  "allin1": {"version": "3.1.0", "raw_json": "raw/allin1.json", "raw_sha256": "..."},
+  "essentia": {"version": "2.1-beta6-git", "profile": "profiles/essentia_v0_1.yaml", "profile_sha256": "...", "raw_json": "raw/essentia.json", "raw_sha256": "..."},
   "created_at": "2026-08-22T15:23:34Z"
 },
 "review": {
@@ -191,4 +177,7 @@ Every audio track processed by the pipeline produces two complementary artifacts
 }
 ```
 
-- Guarantees full auditability and tracks whether an engineer has listened to and verified the analysis.
+- Records content hashes and whether an engineer has listened to and verified the analysis. Existing artifacts are protected by default; `--overwrite` intentionally replaces them.
+
+JAMS observations retain unknown confidence as JSON `null`. The document passes the official JAMS base schema; namespace-strict confidence validation is not claimed because neither extractor supplies a numeric confidence for every observation.
+Native Essentia frame pools that omit timestamps remain available in raw evidence but are not time-aligned or aggregated into Music IR.

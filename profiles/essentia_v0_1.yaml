@@ -1,37 +1,33 @@
 # Essentia Analysis Profile v0.1
-# Standard configuration for audio-to-music-ir extraction
+# Configuration keys follow essentia_streaming_extractor_music.
 
-profile_name: "essentia_v0_1"
-version: "0.1"
+outputFormat: json
+outputFrames: 1
+analysisSampleRate: 44100.0
+requireMbid: false
+indent: 2
 
 lowlevel:
   frameSize: 2048
   hopSize: 1024
-  sampleRate: 44100
+  zeroPadding: 0
   windowType: "blackmanharris62"
-  stats: ["mean", "var", "stdev"]
-  spectral_descriptors:
-    - "spectral_centroid"
-    - "spectral_flux"
-    - "spectral_rolloff"
-    - "spectral_energy"
+  silentFrames: "noise"
+
+average_loudness:
+  frameSize: 88200
+  hopSize: 44100
+  windowType: "hann"
+  silentFrames: "noise"
 
 tonal:
   frameSize: 4096
   hopSize: 2048
-  profiles: ["edma", "temperley", "krumhansl"]
+  zeroPadding: 0
+  windowType: "blackmanharris62"
+  silentFrames: "noise"
 
 rhythm:
   method: "multifeature"
-  minBpm: 40
-  maxBpm: 240
-
-loudness:
-  standard: "ebu128"
-  integrated: true
-  range: true
-
-output:
-  format: "json"
-  aggregate: true
-  frameFeatures: true
+  minTempo: 40
+  maxTempo: 240

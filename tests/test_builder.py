@@ -1,6 +1,7 @@
 import json
 import unittest
 from pathlib import Path
+import tempfile
 
 from src.adapters.allin1_adapter import AllInOneAdapter, AllInOneEvidence
 from src.adapters.essentia_adapter import EssentiaAdapter, EssentiaEvidence
@@ -18,6 +19,9 @@ class TestFusionBuilder(unittest.TestCase):
 
         self.allin1_evidence = AllInOneAdapter().parse_output(self.allin1_raw)
         self.essentia_evidence = EssentiaAdapter().parse_output(self.essentia_raw, profile_name="essentia_v0_1")
+        self.allin1_evidence.raw_sha256 = "a" * 64
+        self.essentia_evidence.raw_sha256 = "b" * 64
+        self.essentia_evidence.profile_sha256 = "c" * 64
 
     def test_pure_deterministic_fusion(self):
         # Same input with explicit created_at must yield identical outputs
@@ -70,28 +74,16 @@ class TestFusionBuilder(unittest.TestCase):
         self.assertEqual(ir["global"]["key_summary"], "D minor")
         self.assertEqual(len(ir["global"]["key_candidates"]), 3)
 
-    def test_symbols_opt_in(self):
-        # Default full_mix -> symbols disabled (ADR-0007)
-        _, ir_default = merge_evidence(
+    def test_unimplemented_symbolic_transcription_is_not_claimed(self):
+        _, ir = merge_evidence(
             allin1_evidence=self.allin1_evidence,
             essentia_evidence=self.essentia_evidence,
             track_id="my-track-001",
             source_file="source/my-track-001.wav",
-            enable_symbols=False,
-            analysis_mode="full_mix",
         )
-        self.assertFalse(ir_default["symbols"]["enabled"])
 
-        # Explicit opt-in -> symbols enabled
-        _, ir_symbols = merge_evidence(
-            allin1_evidence=self.allin1_evidence,
-            essentia_evidence=self.essentia_evidence,
-            track_id="my-track-001",
-            source_file="source/my-track-001.wav",
-            enable_symbols=True,
-            analysis_mode="full_mix",
-        )
-        self.assertTrue(ir_symbols["symbols"]["enabled"])
+        self.assertNotIn("symbols", ir)
+        self.assertNotIn("basic_pitch", ir["provenance"])
 
     def test_jams_no_confidence_spoofing_and_frame_curves(self):
         jams, _ = merge_evidence(
@@ -99,15 +91,38 @@ class TestFusionBuilder(unittest.TestCase):
             essentia_evidence=self.essentia_evidence,
             track_id="my-track-001",
             source_file="source/my-track-001.wav",
+            raw_paths={"allin1": "raw/a.json", "essentia": "raw/e.json"},
+            source_sha256="d" * 64,
         )
 
-        # Sections where confidence was None should not have confidence = 1.0
+        # Unknown confidence remains explicit null, never fabricated as 1.0.
         seg_ann = next(a for a in jams["annotations"] if a["namespace"] == "segment_open")
-        self.assertNotIn("confidence", seg_ann["data"][0])
+        self.assertIsNone(seg_ann["data"][0]["confidence"])
 
-        # Loudness frame curve present (ADR-0005)
-        loudness_ann = next(a for a in jams["annotations"] if a["namespace"] == "loudness")
-        self.assertGreater(len(loudness_ann["data"]), 0)
+        beat_ann = next(a for a in jams["annotations"] if a["namespace"] == "beat")
+        self.assertEqual(
+            [observation["value"] for observation in beat_ann["data"]],
+            [1, 2, 3, 4, 1, 2, 3, 4, 1],
+        )
+
+        frame_ann = next(a for a in jams["annotations"] if a["namespace"] == "vector")
+        self.assertEqual(frame_ann["sandbox"]["columns"], ["loudness_lufs", "spectral_centroid_hz", "spectral_flux"])
+
+        import jams as jams_library
+
+        with tempfile.NamedTemporaryFile("w", suffix=".jams", encoding="utf-8") as output:
+            json.dump(jams, output)
+            output.flush()
+            jams_library.load(output.name, validate=False)
+        jams_library.schema.VALIDATOR.validate(jams)
+
+        self.assertEqual(jams["sandbox"]["allin1_raw_sha256"], "a" * 64)
+        self.assertEqual(jams["sandbox"]["essentia_raw_sha256"], "b" * 64)
+        self.assertEqual(jams["sandbox"]["essentia_profile_sha256"], "c" * 64)
+        self.assertEqual(jams["sandbox"]["source_sha256"], "d" * 64)
+        self.assertEqual(jams["sandbox"]["allin1_raw_json"], "raw/a.json")
+        tempo_ann = next(a for a in jams["annotations"] if a["namespace"] == "tempo")
+        self.assertEqual(tempo_ann["annotation_metadata"]["annotator"]["tool"], "allin1")
 
 
 if __name__ == "__main__":

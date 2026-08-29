@@ -1,4 +1,320 @@
 {
+  "annotations": [
+    {
+      "annotation_metadata": {
+        "curator": {
+          "name": "",
+          "email": ""
+        },
+        "annotator": {
+          "tool": "allin1",
+          "version": "unknown"
+        },
+        "version": "",
+        "corpus": "",
+        "annotation_tools": "",
+        "annotation_rules": "",
+        "validation": "",
+        "data_source": "program"
+      },
+      "namespace": "segment_open",
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 17.2,
+          "value": "intro",
+          "confidence": null
+        },
+        {
+          "time": 17.2,
+          "duration": 31.5,
+          "value": "verse",
+          "confidence": null
+        },
+        {
+          "time": 48.7,
+          "duration": 29.4,
+          "value": "chorus",
+          "confidence": null
+        },
+        {
+          "time": 78.1,
+          "duration": 32.3,
+          "value": "verse",
+          "confidence": null
+        },
+        {
+          "time": 110.4,
+          "duration": 73.02,
+          "value": "outro",
+          "confidence": null
+        }
+      ],
+      "sandbox": {},
+      "time": 0,
+      "duration": 183.42
+    },
+    {
+      "annotation_metadata": {
+        "curator": {
+          "name": "",
+          "email": ""
+        },
+        "annotator": {
+          "tool": "allin1",
+          "version": "unknown"
+        },
+        "version": "",
+        "corpus": "",
+        "annotation_tools": "",
+        "annotation_rules": "",
+        "validation": "",
+        "data_source": "program"
+      },
+      "namespace": "beat",
+      "data": [
+        {
+          "time": 0.45,
+          "duration": 0.0,
+          "value": 1,
+          "confidence": null
+        },
+        {
+          "time": 1.16,
+          "duration": 0.0,
+          "value": 2,
+          "confidence": null
+        },
+        {
+          "time": 1.88,
+          "duration": 0.0,
+          "value": 3,
+          "confidence": null
+        },
+        {
+          "time": 2.59,
+          "duration": 0.0,
+          "value": 4,
+          "confidence": null
+        },
+        {
+          "time": 3.3,
+          "duration": 0.0,
+          "value": 1,
+          "confidence": null
+        },
+        {
+          "time": 4.01,
+          "duration": 0.0,
+          "value": 2,
+          "confidence": null
+        },
+        {
+          "time": 4.73,
+          "duration": 0.0,
+          "value": 3,
+          "confidence": null
+        },
+        {
+          "time": 5.44,
+          "duration": 0.0,
+          "value": 4,
+          "confidence": null
+        },
+        {
+          "time": 6.16,
+          "duration": 0.0,
+          "value": 1,
+          "confidence": null
+        }
+      ],
+      "sandbox": {},
+      "time": 0,
+      "duration": 183.42
+    },
+    {
+      "annotation_metadata": {
+        "curator": {
+          "name": "",
+          "email": ""
+        },
+        "annotator": {
+          "tool": "allin1",
+          "version": "unknown"
+        },
+        "version": "",
+        "corpus": "",
+        "annotation_tools": "",
+        "annotation_rules": "",
+        "validation": "",
+        "data_source": "program"
+      },
+      "namespace": "tempo",
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": 84.0,
+          "confidence": null
+        }
+      ],
+      "sandbox": {},
+      "time": 0,
+      "duration": 183.42
+    },
+    {
+      "annotation_metadata": {
+        "curator": {
+          "name": "",
+          "email": ""
+        },
+        "annotator": {
+          "tool": "essentia",
+          "version": "2.1-beta6-git"
+        },
+        "version": "",
+        "corpus": "",
+        "annotation_tools": "",
+        "annotation_rules": "",
+        "validation": "",
+        "data_source": "program"
+      },
+      "namespace": "key_mode",
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": "D:minor",
+          "confidence": 0.88
+        },
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": "D:minor",
+          "confidence": 0.79
+        },
+        {
+          "time": 0.0,
+          "duration": 183.42,
+          "value": "F:major",
+          "confidence": 0.65
+        }
+      ],
+      "sandbox": {},
+      "time": 0,
+      "duration": 183.42
+    },
+    {
+      "annotation_metadata": {
+        "curator": {
+          "name": "",
+          "email": ""
+        },
+        "annotator": {
+          "tool": "essentia",
+          "version": "2.1-beta6-git"
+        },
+        "version": "",
+        "corpus": "",
+        "annotation_tools": "",
+        "annotation_rules": "",
+        "validation": "",
+        "data_source": "program"
+      },
+      "namespace": "vector",
+      "data": [
+        {
+          "time": 0.0,
+          "duration": 0.0,
+          "value": [
+            -22.0,
+            950.0,
+            0.04
+          ],
+          "confidence": null
+        },
+        {
+          "time": 10.0,
+          "duration": 0.0,
+          "value": [
+            -18.0,
+            1100.0,
+            0.06
+          ],
+          "confidence": null
+        },
+        {
+          "time": 20.0,
+          "duration": 0.0,
+          "value": [
+            -14.0,
+            1450.0,
+            0.11
+          ],
+          "confidence": null
+        },
+        {
+          "time": 50.0,
+          "duration": 0.0,
+          "value": [
+            -11.5,
+            1850.0,
+            0.15
+          ],
+          "confidence": null
+        },
+        {
+          "time": 80.0,
+          "duration": 0.0,
+          "value": [
+            -12.0,
+            1920.0,
+            0.16
+          ],
+          "confidence": null
+        },
+        {
+          "time": 120.0,
+          "duration": 0.0,
+          "value": [
+            -13.5,
+            1600.0,
+            0.12
+          ],
+          "confidence": null
+        },
+        {
+          "time": 150.0,
+          "duration": 0.0,
+          "value": [
+            -15.0,
+            1300.0,
+            0.08
+          ],
+          "confidence": null
+        },
+        {
+          "time": 180.0,
+          "duration": 0.0,
+          "value": [
+            -20.0,
+            980.0,
+            0.05
+          ],
+          "confidence": null
+        }
+      ],
+      "sandbox": {
+        "columns": [
+          "loudness_lufs",
+          "spectral_centroid_hz",
+          "spectral_flux"
+        ]
+      },
+      "time": 0,
+      "duration": 183.42
+    }
+  ],
   "file_metadata": {
     "title": "demo-track-001",
     "artist": "",
@@ -7,205 +323,19 @@
     "identifiers": {
       "track_id": "demo-track-001"
     },
-    "jams_version": "0.3.4"
+    "jams_version": "0.3.5"
   },
-  "annotations": [
-    {
-      "namespace": "segment_open",
-      "annotation_metadata": {
-        "curator": {
-          "name": "allin1",
-          "email": ""
-        },
-        "data_source": "allin1 structure analysis"
-      },
-      "data": [
-        {
-          "time": 0.0,
-          "duration": 17.2,
-          "value": "intro"
-        },
-        {
-          "time": 17.2,
-          "duration": 31.5,
-          "value": "verse"
-        },
-        {
-          "time": 48.7,
-          "duration": 29.4,
-          "value": "chorus"
-        },
-        {
-          "time": 78.1,
-          "duration": 32.3,
-          "value": "verse"
-        },
-        {
-          "time": 110.4,
-          "duration": 73.02,
-          "value": "outro"
-        }
-      ]
-    },
-    {
-      "namespace": "beat",
-      "annotation_metadata": {
-        "curator": {
-          "name": "allin1",
-          "email": ""
-        },
-        "data_source": "allin1 beat tracking"
-      },
-      "data": [
-        {
-          "time": 0.45,
-          "duration": 0.0,
-          "value": 1
-        },
-        {
-          "time": 1.16,
-          "duration": 0.0,
-          "value": 2
-        },
-        {
-          "time": 1.88,
-          "duration": 0.0,
-          "value": 3
-        },
-        {
-          "time": 2.59,
-          "duration": 0.0,
-          "value": 4
-        },
-        {
-          "time": 3.3,
-          "duration": 0.0,
-          "value": 5
-        },
-        {
-          "time": 4.01,
-          "duration": 0.0,
-          "value": 6
-        },
-        {
-          "time": 4.73,
-          "duration": 0.0,
-          "value": 7
-        },
-        {
-          "time": 5.44,
-          "duration": 0.0,
-          "value": 8
-        },
-        {
-          "time": 6.16,
-          "duration": 0.0,
-          "value": 9
-        }
-      ]
-    },
-    {
-      "namespace": "tempo",
-      "annotation_metadata": {
-        "curator": {
-          "name": "allin1/essentia",
-          "email": ""
-        },
-        "data_source": "tempo estimation"
-      },
-      "data": [
-        {
-          "time": 0.0,
-          "duration": 183.42,
-          "value": 84.0
-        }
-      ]
-    },
-    {
-      "namespace": "key_mode",
-      "annotation_metadata": {
-        "curator": {
-          "name": "essentia",
-          "email": ""
-        },
-        "data_source": "essentia key estimation"
-      },
-      "data": [
-        {
-          "time": 0.0,
-          "duration": 183.42,
-          "value": "D minor",
-          "confidence": 0.88
-        },
-        {
-          "time": 0.0,
-          "duration": 183.42,
-          "value": "D minor",
-          "confidence": 0.79
-        },
-        {
-          "time": 0.0,
-          "duration": 183.42,
-          "value": "F major",
-          "confidence": 0.65
-        }
-      ]
-    },
-    {
-      "namespace": "loudness",
-      "annotation_metadata": {
-        "curator": {
-          "name": "essentia",
-          "email": ""
-        },
-        "data_source": "essentia frame-level loudness"
-      },
-      "data": [
-        {
-          "time": 0.0,
-          "duration": 0.0,
-          "value": -22.0
-        },
-        {
-          "time": 10.0,
-          "duration": 0.0,
-          "value": -18.0
-        },
-        {
-          "time": 20.0,
-          "duration": 0.0,
-          "value": -14.0
-        },
-        {
-          "time": 50.0,
-          "duration": 0.0,
-          "value": -11.5
-        },
-        {
-          "time": 80.0,
-          "duration": 0.0,
-          "value": -12.0
-        },
-        {
-          "time": 120.0,
-          "duration": 0.0,
-          "value": -13.5
-        },
-        {
-          "time": 150.0,
-          "duration": 0.0,
-          "value": -15.0
-        },
-        {
-          "time": 180.0,
-          "duration": 0.0,
-          "value": -20.0
-        }
-      ]
-    }
-  ],
   "sandbox": {
     "allin1_version": "unknown",
-    "essentia_version": "2.1-beta6-git"
+    "essentia_version": "2.1-beta6-git",
+    "allin1_raw_json": "tests/fixtures/allin1_sample.json",
+    "essentia_raw_json": "tests/fixtures/essentia_sample.json",
+    "allin1_raw_sha256": "2ad0b3462f10eacbf004a6384dea027c08c90a9dab19c2a3fb9da2c471922d28",
+    "essentia_raw_sha256": "2ce59450e0a2e4a6c8fab07491221306d704d7852898ec9d3b664e814f32a835",
+    "essentia_profile_sha256": "951db93fd9ec885c7d52206396359a26f5d1e29cb246b14f46ca8b3c5af9883b",
+    "source_file": "source/demo-track-001.wav",
+    "source_sha256": null,
+    "created_at": "2026-08-23T00:00:00Z",
+    "validation": "jams_schema; namespace confidence unavailable"
   }
 }
