@@ -1,3 +1,8 @@
-# 0007. Explicit Opt-In Policy for Symbolic Transcription on Full Mixes
+# 0007. Use Basic Pitch for Isolated Sources, Never as Score Ground Truth
 
-We decided that automatic music transcription (AMT / MIDI generation via Basic Pitch) will be disabled by default for full-mix recordings (`analysis_mode: full_mix`), because polyphonic multi-instrument mix transcription generates severe ghost-note artifacts. Symbol extraction can only be enabled via explicit flag `--enable-symbols` or for solo tracks (`analysis_mode: solo`).
+Solo and caller-provided stem analyses run the real Basic Pitch adapter and
+publish note JSON plus MIDI when the model succeeds. Full mixes run it only on
+non-drum Demucs stems; the drums stem is represented by activity/onset
+evidence. Every note artifact records the actual package/model version and is
+marked machine transcription, not a symbolic-score ground truth. Basic Pitch
+amplitude remains amplitude and is never renamed as loudness.

@@ -10,8 +10,8 @@ Every audio track processed by the pipeline produces two complementary artifacts
 
 | Artifact | File Name | Target Consumer | Primary Role |
 | :--- | :--- | :--- | :--- |
-| **Music IR** | `<track-id>.music-ir.json` | Downstream Multimodal Agents / Synthesis Systems | **Domain-aligned, concise (<10KB) structural representation** for high-level musical reasoning and parametric control. |
-| **JAMS Archive** | `<track-id>.analysis.jams` | Audio Researchers / Verification Tools | **Immutable time-series evidence archive** preserving all raw observations, multi-candidate hypotheses, and tool provenance. |
+| **Music IR** | `<track-id>.music-ir.json` | Downstream Multimodal Agents / Synthesis Systems | **Domain-aligned compact summary** for high-level musical reasoning and parametric control; full frame arrays stay outside it. |
+| **JAMS Archive** | `<track-id>.analysis.jams` | Audio Researchers / Verification Tools | **Schema-validated time-series evidence** preserving timing observations, frame vectors, multi-candidate hypotheses, and tool provenance. |
 
 ---
 
@@ -114,7 +114,7 @@ Every audio track processed by the pipeline produces two complementary artifacts
 }
 ```
 
-- **`chord_statistics.histogram`**: Global distribution of detected pitch chroma triad activations.
+- **`chord_statistics.histogram`**: Essentia's normalized chord histogram, preserved as the extractor emits it (typically a numeric array; fixture data may use a labeled object).
 - **`chord_statistics.changes_rate`**: Harmonic rhythm speed (approximate chord transitions per second).
 - **`time_aligned_chords.enabled`**: Set to `false` in V0.1 ([ADR-0006](file:///Users/dmus/Transverse%20Sound%20Lab/Agent%20Listening/docs/adr/0006-harmony-key-commitment.md)).
 
@@ -145,27 +145,12 @@ Every audio track processed by the pipeline produces two complementary artifacts
 
 ---
 
-### 2.6 Symbols / Transcription (`symbols`)
-
-```json
-"symbols": {
-  "enabled": false,
-  "note_events_csv": null,
-  "midi_file": null,
-  "caveat": "Disabled by default for full mix audio (ADR-0007)."
-}
-```
-
-- **`enabled`** (`boolean`): Disabled by default for full mixes to prevent ghost-note pollution ([ADR-0007](file:///Users/dmus/Transverse%20Sound%20Lab/Agent%20Listening/docs/adr/0007-opt-in-symbolic-transcription.md)). Enabled only for solo instrumental inputs.
-
----
-
-### 2.7 Interpretation & Hints (`interpretation`)
+### 2.6 Interpretation & Hints (`interpretation`)
 
 ```json
 "interpretation": {
   "manual_notes": [],
-  "derived_summary": {"enabled": false},
+  "derived_summary": {"enabled": false, "rule": "Can only be generated from evidence and manual notes (ADR-0004)."},
   "synthesis_hints": {
     "enabled": false,
     "notes": "Synthesis mapping delegated to downstream agent (ADR-0004)."
@@ -177,12 +162,13 @@ Every audio track processed by the pipeline produces two complementary artifacts
 
 ---
 
-### 2.8 Provenance & Review (`provenance`, `review`)
+### 2.7 Provenance & Review (`provenance`, `review`)
 
 ```json
 "provenance": {
-  "allin1": {"version": "0.1.0", "raw_json": "raw/allin1.json"},
-  "essentia": {"version": "2.1-beta6-git", "profile": "profiles/essentia_v0_1.yaml", "raw_json": "raw/essentia.json"},
+  "source": {"sha256": "..."},
+  "allin1": {"version": "3.1.0", "raw_json": "raw/allin1.json", "raw_sha256": "..."},
+  "essentia": {"version": "2.1-beta6-git", "profile": "profiles/essentia_v0_1.yaml", "profile_sha256": "...", "raw_json": "raw/essentia.json", "raw_sha256": "..."},
   "created_at": "2026-08-22T15:23:34Z"
 },
 "review": {
@@ -191,4 +177,65 @@ Every audio track processed by the pipeline produces two complementary artifacts
 }
 ```
 
-- Guarantees full auditability and tracks whether an engineer has listened to and verified the analysis.
+- Records content hashes and whether an engineer has listened to and verified the analysis. Existing artifacts are protected by default; `--overwrite` intentionally replaces them.
+
+JAMS observations retain unknown confidence as JSON `null`. The document passes the official JAMS base schema; namespace-strict confidence validation is not claimed because neither extractor supplies a numeric confidence for every observation.
+Native Essentia frame pools receive explicit low-level, tonal, or EBU momentary
+time grids from the configured analysis sample rate and hop semantics. If a
+legal grid cannot be established, the values remain raw-only and are not used
+as section evidence.
+
+## 3. Music IR 0.2 additions
+
+The current compiler emits `schema_version: "music-ir/0.2"`. The historical
+`music-ir/0.1` schema remains available for old artifacts and is selected by
+the validator from the artifact's own version.
+
+### 3.1 Capabilities and review
+
+`capabilities` uses explicit statuses: `available`, `not_applicable`,
+`not_detected`, or `failed`. Typical keys are `essentia`, `frame_evidence`,
+`rhythm`, `functional_sections`, `material_events`, `pitch`, `notes`,
+`sources`, and `source_separation`.
+
+`review.human_checked` is `false` for every automatic run. The per-domain
+values (`rhythm`, `structure`, `key`, `pitch`, `notes`, `sources`, and
+`material_events`) are
+review queues, not confidence scores. Machine transcription and source
+separation must be auditioned before being treated as a confirmed musical
+fact.
+
+### 3.2 Material events
+
+`structure.material_events` contains deterministic change candidates derived
+from adjacent Essentia frames. The score uses robustly normalized changes in
+spectral flux, centroid, energy bands, and loudness, with a fixed 1.2 threshold
+and 0.5-second minimum separation. Each candidate has `time_s`, prominence,
+changed feature names, before/after windows, `label: "material_change_candidate"`,
+and `review_status: "machine_candidate"`.
+The same event is written to a JAMS `onset` annotation so a human can jump to
+the timestamp in an external player or DAW.
+
+### 3.3 Pitch, notes, and sources
+
+`pitch` summarizes the Essentia `PitchYinProbabilistic` contour with range,
+median MIDI pitch, voiced ratio, note count, note density, and (when available)
+a 12-bin pitch-class distribution. The complete contour remains in JAMS and
+the raw pitch JSON. `symbols` points to Basic Pitch note JSON/MIDI artifacts;
+the note JSON preserves start/end, MIDI pitch, frequency, amplitude,
+confidence (when supplied), and optional pitch bends. Basic Pitch amplitude is
+not loudness, and these notes are machine transcription rather than score
+ground truth.
+
+In `full_mix`, `sources` lists only existing Demucs stems. Each source records
+its role, SHA-256, duration when available, activity/energy summary, extractor
+and separation model versions, and optional pitch/note summaries. The drums
+source deliberately has `notes.status: "not_applicable"`.
+
+### 3.4 Progressive disclosure
+
+The CLI receipt is the first artifact to read. Then read compact Music IR,
+JAMS, optional symbols/stems, and raw JSON only for audit or diagnosis. Full
+frame arrays never belong in the default agent prompt. Numeric waveform and
+spectrum evidence is retained; this project does not render a GUI, plot, Web
+page, or report file.

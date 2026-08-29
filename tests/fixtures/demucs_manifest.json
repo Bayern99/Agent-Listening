@@ -1,0 +1,10 @@
+{
+  "tool": "demucs-infer",
+  "version": "4.2.2",
+  "model": "htdemucs_6s",
+  "stems": [
+    {"id": "vocals", "role": "vocals", "path": "vocals.wav"},
+    {"id": "drums", "role": "drums", "path": "missing.wav"},
+    {"id": "unknown", "role": "unknown", "path": "vocals.wav"}
+  ]
+}

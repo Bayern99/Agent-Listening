@@ -1,11 +1,12 @@
-"""Schema Validator for Music IR v0.1.
-
-Strictly validates Music IR dictionaries against `schemas/music-ir-v0.1.schema.json`.
-"""
+"""JSON Schema validation for versioned Music IR artifacts."""
 
 import json
+from math import isclose
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
+
+from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 
 
 class ValidationError(Exception):
@@ -14,113 +15,47 @@ class ValidationError(Exception):
 
 
 # Cache loaded schema in memory
-_CACHED_SCHEMA: Optional[Dict[str, Any]] = None
+_CACHED_SCHEMAS: Dict[str, Dict[str, Any]] = {}
 
 
 def load_schema(schema_path: Optional[str] = None) -> Dict[str, Any]:
     """Load JSON Schema from disk or cache."""
-    global _CACHED_SCHEMA
-    if _CACHED_SCHEMA is not None and schema_path is None:
-        return _CACHED_SCHEMA
-
-    target_path = Path(schema_path) if schema_path else Path(__file__).parent.parent.parent / "schemas" / "music-ir-v0.1.schema.json"
+    target_path = Path(schema_path) if schema_path else Path(__file__).parent.parent.parent / "schemas" / "music-ir-v0.2.schema.json"
+    cache_key = str(target_path)
+    if cache_key in _CACHED_SCHEMAS:
+        return _CACHED_SCHEMAS[cache_key]
     with open(target_path, "r", encoding="utf-8") as f:
         schema = json.load(f)
-
-    if schema_path is None:
-        _CACHED_SCHEMA = schema
+    _CACHED_SCHEMAS[cache_key] = schema
     return schema
 
 
-def _check_type(val: Any, expected_type: Union[str, List[str]], path: str) -> None:
-    """Validate python primitive against JSON Schema type(s)."""
-    type_map = {
-        "object": dict,
-        "array": list,
-        "string": str,
-        "number": (int, float),
-        "boolean": bool,
-        "null": type(None),
-    }
-
-    if isinstance(expected_type, list):
-        valid = False
-        for t in expected_type:
-            if t == "null" and val is None:
-                valid = True
-                break
-            elif t in type_map and isinstance(val, type_map[t]) and not (t != "boolean" and isinstance(val, bool)):
-                valid = True
-                break
-        if not valid:
-            raise ValidationError(f"Type mismatch at '{path}': expected one of {expected_type}, got {type(val).__name__} ({repr(val)})")
-        return
-
-    if expected_type == "null":
-        if val is not None:
-            raise ValidationError(f"Type mismatch at '{path}': expected null, got {type(val).__name__}")
-        return
-
-    expected_cls = type_map.get(expected_type)
-    if expected_cls is None:
-        return
-
-    # In Python, bool is a subclass of int, so handle specifically
-    if expected_type == "number" and isinstance(val, bool):
-        raise ValidationError(f"Type mismatch at '{path}': expected number, got bool")
-    if expected_type != "boolean" and isinstance(val, bool):
-        raise ValidationError(f"Type mismatch at '{path}': expected {expected_type}, got bool")
-
-    if not isinstance(val, expected_cls):
-        raise ValidationError(f"Type mismatch at '{path}': expected {expected_type}, got {type(val).__name__}")
-
-
-def _validate_node(instance: Any, schema_node: Dict[str, Any], path: str = "$") -> None:
-    """Recursively validate instance against schema sub-node."""
-    # 1. Type validation
-    if "type" in schema_node:
-        _check_type(instance, schema_node["type"], path)
-
-    # 2. Const validation
-    if "const" in schema_node:
-        if instance != schema_node["const"]:
-            raise ValidationError(f"Const mismatch at '{path}': expected '{schema_node['const']}', got '{instance}'")
-
-    # 3. Enum validation
-    if "enum" in schema_node:
-        if instance not in schema_node["enum"]:
-            raise ValidationError(f"Enum mismatch at '{path}': '{instance}' not in {schema_node['enum']}")
-
-    # 4. Minimum validation
-    if "minimum" in schema_node:
-        if isinstance(instance, (int, float)) and instance < schema_node["minimum"]:
-            raise ValidationError(f"Value at '{path}' ({instance}) is less than minimum {schema_node['minimum']}")
-
-    # 5. Object validation
-    if isinstance(instance, dict):
-        required_keys = schema_node.get("required", [])
-        for req in required_keys:
-            if req not in instance:
-                raise ValidationError(f"Missing required property '{req}' at '{path}'")
-
-        properties = schema_node.get("properties", {})
-        for key, val in instance.items():
-            if key in properties:
-                _validate_node(val, properties[key], f"{path}.{key}")
-
-    # 6. Array validation
-    if isinstance(instance, list) and "items" in schema_node:
-        item_schema = schema_node["items"]
-        for idx, item in enumerate(instance):
-            _validate_node(item, item_schema, f"{path}[{idx}]")
-
-
 def validate_music_ir(data: Dict[str, Any], schema: Optional[Dict[str, Any]] = None) -> None:
-    """Validate Music IR dictionary against schema rules."""
-    if not isinstance(data, dict):
-        raise ValidationError("Music IR root must be a JSON object")
-
+    """Validate a Music IR dictionary against Draft 2020-12."""
     if schema is None:
-        schema = load_schema()
+        version = data.get("schema_version", "music-ir/0.2")
+        schema_name = "music-ir-v0.1.schema.json" if version == "music-ir/0.1" else "music-ir-v0.2.schema.json"
+        schema = load_schema(str(Path(__file__).parent.parent.parent / "schemas" / schema_name))
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    try:
+        validator.validate(data)
+    except JsonSchemaValidationError as exc:
+        location = ".".join(str(part) for part in exc.absolute_path) or "$"
+        raise ValidationError(f"{location}: {exc.message}") from exc
 
-    _validate_node(data, schema, "$")
+    duration = data["track"]["duration_s"]
+    for field in ("beats_s", "downbeats_s"):
+        timestamps = data["structure"][field]
+        if timestamps != sorted(timestamps) or any(timestamp > duration + 1e-3 for timestamp in timestamps):
+            raise ValidationError(f"structure.{field}: timestamps must be sorted within track duration")
+
+    sections = data["structure"]["sections"]
+    previous_end = 0.0
+    for index, section in enumerate(sections):
+        start, end = section["start_s"], section["end_s"]
+        if start >= end or not isclose(start, previous_end, abs_tol=1e-3) or end > duration + 1e-3:
+            raise ValidationError(f"structure.sections.{index}: sections must be continuous, ordered, and within duration")
+        previous_end = end
+    if sections and not isclose(previous_end, duration, abs_tol=1e-3):
+        raise ValidationError("structure.sections: sections must cover the full track duration")

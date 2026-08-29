@@ -1,4 +1,4 @@
-"""Agent Listening (Audio-to-Music-IR).
+"""Agent Listening CLI (Audio-to-Music-IR).
 
 Deep module providing a minimal public interface for audio music perception.
 """

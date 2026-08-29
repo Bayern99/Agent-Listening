@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MusicIR 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "track", "global", "structure", "harmony", "audio_features", "capabilities", "interpretation", "provenance", "pitch", "sources", "symbols", "review"],
+  "properties": {
+    "schema_version": { "const": "music-ir/0.2" },
+    "track": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "source_file", "duration_s", "analysis_mode"],
+      "properties": {
+        "id": { "type": "string" }, "title": { "type": "string" },
+        "source_file": { "type": "string" },
+        "duration_s": { "type": "number", "minimum": 0 },
+        "analysis_mode": { "enum": ["full_mix", "stem", "solo"] }
+      }
+    },
+    "global": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tempo_bpm", "meter", "key_summary", "key_candidates"],
+      "properties": {
+        "tempo_bpm": {
+          "type": "object", "additionalProperties": false, "required": ["value"],
+            "properties": {
+            "value": { "type": ["number", "null"] },
+            "evidence": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["tool", "field", "value"], "properties": { "tool": { "type": "string" }, "field": { "type": "string" }, "value": { "type": "number" } } } },
+            "candidates": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["bpm", "weight", "tool"], "properties": { "bpm": { "type": "number" }, "weight": { "type": ["number", "null"] }, "tool": { "type": "string" } } } }
+          }
+        },
+        "meter": { "type": "object", "additionalProperties": false, "required": ["value", "status"], "properties": { "value": { "type": ["string", "null"] }, "status": { "type": "string" } } },
+        "key_summary": { "type": ["string", "null"] },
+        "key_candidates": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["key", "scale", "strength", "tool", "algorithm"], "properties": { "key": { "type": "string" }, "scale": { "type": "string" }, "strength": { "type": "number", "minimum": 0, "maximum": 1 }, "tool": { "type": "string" }, "algorithm": { "type": "string" } } } }
+      }
+    },
+    "structure": {
+      "type": "object", "additionalProperties": false, "required": ["beats_s", "downbeats_s", "sections", "material_events"],
+      "properties": {
+        "beats_s": { "type": "array", "items": { "type": "number", "minimum": 0 } },
+        "downbeats_s": { "type": "array", "items": { "type": "number", "minimum": 0 } },
+        "sections": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["start_s", "end_s", "label", "tool"], "properties": { "start_s": { "type": "number", "minimum": 0 }, "end_s": { "type": "number", "minimum": 0 }, "label": { "type": "string" }, "tool": { "type": "string" }, "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }, "loudness_lufs": { "type": ["number", "null"] }, "spectral_centroid_hz": { "type": ["number", "null"] }, "dynamic_complexity": { "type": ["number", "null"] } } } },
+        "material_events": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["time_s", "prominence", "changed_features", "before_window_s", "after_window_s", "label", "review_status"], "properties": { "time_s": { "type": "number", "minimum": 0 }, "prominence": { "type": "number", "minimum": 0, "maximum": 1 }, "changed_features": { "type": "array", "items": { "type": "string" } }, "before_window_s": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": 0 } }, "after_window_s": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": 0 } }, "label": { "type": "string" }, "review_status": { "type": "string" } } } }
+      }
+    },
+    "harmony": {
+      "type": "object", "additionalProperties": false, "required": ["key_summary", "chord_statistics", "time_aligned_chords"],
+      "properties": {
+        "key_summary": { "type": ["string", "null"] },
+        "chord_statistics": { "type": "object", "additionalProperties": false, "required": ["histogram", "changes_rate", "source"], "properties": { "histogram": { "type": ["object", "array"] }, "changes_rate": { "type": ["number", "null"] }, "source": { "type": "string" } } },
+        "time_aligned_chords": { "type": "object", "additionalProperties": false, "required": ["enabled", "status"], "properties": { "enabled": { "type": "boolean" }, "status": { "type": "string" } } }
+      }
+    },
+    "audio_features": {
+      "type": "object", "additionalProperties": true,
+      "required": ["loudness_ebu128_integrated_lufs", "dynamic_complexity", "spectral_centroid_hz_mean"],
+      "properties": { "loudness_ebu128_integrated_lufs": { "type": "number" }, "loudness_range_lu": { "type": "number" }, "dynamic_complexity": { "type": "number" }, "spectral_centroid_hz_mean": { "type": "number" }, "spectral_flux_mean": { "type": "number" }, "onset_rate_per_s": { "type": "number" }, "notes": { "type": "string" } }
+    },
+    "capabilities": { "type": "object", "additionalProperties": { "enum": ["available", "not_applicable", "not_detected", "failed"] } },
+    "interpretation": {
+      "type": "object", "additionalProperties": false, "required": ["manual_notes", "derived_summary", "synthesis_hints"],
+      "properties": {
+        "manual_notes": { "type": "array", "items": { "type": "string" } },
+        "derived_summary": { "type": "object", "additionalProperties": false, "required": ["enabled", "rule"], "properties": { "enabled": { "type": "boolean" }, "rule": { "type": "string" } } },
+        "synthesis_hints": { "type": "object", "additionalProperties": false, "required": ["enabled", "notes"], "properties": { "enabled": { "type": "boolean" }, "notes": { "type": "string" } } }
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false, "required": ["created_at", "extractor_runs"],
+      "properties": {
+        "source": { "type": "object", "additionalProperties": false, "required": ["sha256"], "properties": { "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
+        "allin1": { "$ref": "#/$defs/legacy_extractor" },
+        "essentia": { "$ref": "#/$defs/essentia_extractor" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "extractor_runs": { "type": "array", "items": { "type": "object", "additionalProperties": true, "required": ["id", "tool", "version", "status"], "properties": { "id": { "type": "string" }, "tool": { "type": "string" }, "version": { "type": "string" }, "status": { "type": "string" }, "raw_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }, "profile_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" } } } }
+      }
+    },
+    "pitch": { "type": "object", "additionalProperties": true, "required": ["status"], "properties": { "status": { "type": "string" }, "contour": { "type": ["array", "null"] }, "pitch_range_midi": { "type": ["array", "null"] }, "median_midi": { "type": ["number", "null"] }, "voiced_ratio": { "type": ["number", "null"] }, "note_count": { "type": ["integer", "null"], "minimum": 0 }, "note_density_per_s": { "type": ["number", "null"], "minimum": 0 }, "pitch_class_distribution": { "type": ["array", "null"], "minItems": 12, "maxItems": 12, "items": { "type": "number", "minimum": 0, "maximum": 1 } } } },
+    "sources": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "symbols": { "type": "object", "additionalProperties": true, "required": ["status", "artifacts", "ground_truth"], "properties": { "status": { "type": "string" }, "artifacts": { "type": "array" }, "ground_truth": { "const": false } } },
+    "review": { "type": "object", "additionalProperties": false, "required": ["human_checked", "domains"], "properties": { "human_checked": { "type": "boolean" }, "domains": { "type": "object", "additionalProperties": { "type": "string" } }, "known_uncertainties": { "type": "array", "items": { "type": "string" } } } }
+  },
+  "$defs": {
+    "legacy_extractor": { "type": "object", "additionalProperties": true, "required": ["version", "raw_json", "raw_sha256"], "properties": { "version": { "type": "string" }, "profile": { "type": "string" }, "raw_json": { "type": "string" }, "raw_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
+    "essentia_extractor": { "allOf": [{ "$ref": "#/$defs/legacy_extractor" }], "required": ["profile_sha256"] }
+  }
+}

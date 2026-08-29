@@ -1,6 +1,10 @@
 # AGENTS.md
 
-Welcome to **Agent Listening** (Audio-to-Music-IR). This project converts finished mixed audio into structured, machine-readable, and verified intermediate representations (Music IR) for consumption by downstream multimodal music agents and sound synthesis systems.
+Welcome to **Agent Listening CLI** (Audio-to-Music-IR). The project/distribution
+name is `agent-listening-cli`; the stable executable and Skill name remain
+`agent-listening`. It converts finished mixed audio into structured,
+machine-readable, and verified intermediate representations (Music IR) for
+consumption by downstream multimodal music agents and sound synthesis systems.
 
 ---
 
@@ -33,7 +37,7 @@ Single-context layout at repo root (`CONTEXT.md` and `docs/adr/`). See `docs/age
    - **Pure Transformations**: Make data fusion functions pure and deterministic (`merge_evidence(raw_allin1, raw_essentia) -> (JAMS, MusicIR)`).
 
 3. **Dual-Artifact Preservation**:
-   - **`analysis.jams`**: Immutable archive of all raw observations, timing annotations, multi-candidates, and tool provenance.
+   - **`analysis.jams`**: JAMS-structured timing evidence, multi-candidates, and tool provenance. Writes are no-clobber by default; explicit overwrite is a destructive replacement.
    - **`music-ir.json`**: Compact, domain-aligned representation tailored for downstream agent reasoning and sound synthesis parameterization.
 
 4. **Test-Driven Development (TDD)**:
@@ -47,6 +51,9 @@ Single-context layout at repo root (`CONTEXT.md` and `docs/adr/`). See `docs/age
 ```text
 .
 ├── AGENTS.md                         # This file (Agent entry point & instructions)
+├── README.md                         # Setup, commands, and current capability boundary
+├── LICENSE / CREDITS.md               # Project license and third-party notices
+├── pyproject.toml / uv.lock          # Python 3.11 dependency contract
 ├── CONTEXT.md                        # Ubiquitous domain glossary (no implementation noise)
 ├── docs/
 │   ├── adr/                          # Architectural Decision Records

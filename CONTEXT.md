@@ -1,4 +1,4 @@
-# Agent Listening (Audio-to-Music-IR)
+# Agent Listening CLI (Audio-to-Music-IR)
 
 A system for analyzing finished audio recordings into structured, verified intermediate representations (Music IR) to drive multimodal agent reasoning and sound synthesis systems.
 
@@ -49,7 +49,7 @@ The compact, multi-layered intermediate JSON schema representing a track's globa
 _Avoid_: Music spec, audio transcript, metadata JSON
 
 **JAMS Archive**:
-The immutable, standardized time-series annotation file preserving all raw observations and candidates.
+The replaceable, schema-validated time-series annotation file carrying normalized evidence, candidates, and provenance pointers. Raw extractor outputs remain separate artifacts.
 _Avoid_: Output JSON, cache
 
 **Realization Hint**:
