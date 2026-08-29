@@ -1,5 +1,7 @@
 # Agent Listening CLI
 
+[简体中文](README.zh-CN.md)
+
 Agent Listening CLI is a local, deterministic, artifact-first audio analysis
 tool. It turns a finished recording into a compact Music IR for downstream
 agents, a time-aligned JAMS evidence archive, and preserved raw extractor
