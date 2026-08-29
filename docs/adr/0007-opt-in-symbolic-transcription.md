@@ -1,3 +1,8 @@
-# 0007. Defer Symbolic Transcription Until It Has a Real Adapter
+# 0007. Use Basic Pitch for Isolated Sources, Never as Score Ground Truth
 
-We decided that V0.1 will not expose symbolic-transcription flags or artifact paths. A later Basic Pitch integration must run a real adapter, record its actual version, validate its MIDI/CSV outputs, and remain opt-in for full mixes.
+Solo and caller-provided stem analyses run the real Basic Pitch adapter and
+publish note JSON plus MIDI when the model succeeds. Full mixes run it only on
+non-drum Demucs stems; the drums stem is represented by activity/onset
+evidence. Every note artifact records the actual package/model version and is
+marked machine transcription, not a symbolic-score ground truth. Basic Pitch
+amplitude remains amplitude and is never renamed as loudness.

@@ -1,4 +1,4 @@
-"""JSON Schema validation for Music IR v0.1."""
+"""JSON Schema validation for versioned Music IR artifacts."""
 
 import json
 from math import isclose
@@ -15,27 +15,27 @@ class ValidationError(Exception):
 
 
 # Cache loaded schema in memory
-_CACHED_SCHEMA: Optional[Dict[str, Any]] = None
+_CACHED_SCHEMAS: Dict[str, Dict[str, Any]] = {}
 
 
 def load_schema(schema_path: Optional[str] = None) -> Dict[str, Any]:
     """Load JSON Schema from disk or cache."""
-    global _CACHED_SCHEMA
-    if _CACHED_SCHEMA is not None and schema_path is None:
-        return _CACHED_SCHEMA
-
-    target_path = Path(schema_path) if schema_path else Path(__file__).parent.parent.parent / "schemas" / "music-ir-v0.1.schema.json"
+    target_path = Path(schema_path) if schema_path else Path(__file__).parent.parent.parent / "schemas" / "music-ir-v0.2.schema.json"
+    cache_key = str(target_path)
+    if cache_key in _CACHED_SCHEMAS:
+        return _CACHED_SCHEMAS[cache_key]
     with open(target_path, "r", encoding="utf-8") as f:
         schema = json.load(f)
-
-    if schema_path is None:
-        _CACHED_SCHEMA = schema
+    _CACHED_SCHEMAS[cache_key] = schema
     return schema
 
 
 def validate_music_ir(data: Dict[str, Any], schema: Optional[Dict[str, Any]] = None) -> None:
     """Validate a Music IR dictionary against Draft 2020-12."""
-    schema = schema or load_schema()
+    if schema is None:
+        version = data.get("schema_version", "music-ir/0.2")
+        schema_name = "music-ir-v0.1.schema.json" if version == "music-ir/0.1" else "music-ir-v0.2.schema.json"
+        schema = load_schema(str(Path(__file__).parent.parent.parent / "schemas" / schema_name))
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     try:

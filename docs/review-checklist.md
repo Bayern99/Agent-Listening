@@ -59,6 +59,21 @@ Verify that acoustic parameters fall within normal physical musical ranges:
 - [ ] **Spectral Centroid (Hz)**: Typically between `800 Hz` (dark/bass-heavy) and `4500 Hz` (bright/sizzling).
 - [ ] **Onset Rate**: Typically between `0.5` (ambient/drone) and `8.0` (fast drum/percussion).
 
+## Step 4A: Material, Pitch, and Source Candidates (Music IR 0.2)
+
+- [ ] Jump to each `structure.material_events[].time_s` in the external player
+  or DAW and decide whether the before/after windows describe a real material
+  change. Keep the machine candidate label when it is useful; record a human
+  decision in `review.known_uncertainties` or project notes rather than
+  silently rewriting raw evidence.
+- [ ] Treat `pitch` and `symbols` as machine observations. Compare the JAMS
+  `pitch_contour` and `note_midi` timestamps with the audio; never treat MIDI
+  notes as a score without a separate human transcription decision.
+- [ ] For `full_mix`, audition each listed `sources[].audio_file` and confirm
+  the Demucs role is useful for the intended downstream task. A source with
+  `status: "failed"` or activity `status: "not_detected"` needs a human or
+  alternate tool before it is used as a musical fact.
+
 ---
 
 ## Step 5: Finalizing the Audit

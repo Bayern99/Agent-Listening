@@ -1,6 +1,8 @@
-# 0010. Dual-Mode CLI Pipeline: Native Audio Extraction and Offline JSON Compilation
+# 0010. CLI Analysis Modes and Offline Evidence Compilation
 
-We decided that the CLI interface will expose two operational modes:
-1. `analyze <audio>`: Executes native CLI extractors on audio files, providing clear diagnostic hints if dependencies are missing.
-2. `build-ir --allin1 <path> --essentia <path>`: Pure offline evidence compilation that generates JAMS and Music IR from existing JSON fixtures without C++ or PyTorch dependencies.
-This guarantees 100% testability across CI/CD and developer environments.
+The public analysis command keeps three explicit source semantics:
+`solo` (one isolated source), `stem` (a caller-identified stem), and
+`full_mix` (all-in-one plus Demucs separation and per-stem evidence). The
+developer-only `build-ir` command remains a pure offline compiler for captured
+extractor JSON and fixtures. Both paths emit the same compact Music IR/JAMS
+contract and never start a server or load raw evidence into an agent context.

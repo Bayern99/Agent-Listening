@@ -1,4 +1,4 @@
-# Agent Listening (Audio-to-Music-IR)
+# Agent Listening CLI (Audio-to-Music-IR)
 
 A system for analyzing finished audio recordings into structured, verified intermediate representations (Music IR) to drive multimodal agent reasoning and sound synthesis systems.
 

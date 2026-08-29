@@ -31,6 +31,12 @@ class TestMusicIRValidator(unittest.TestCase):
         # Should validate without raising ValidationError
         validate_music_ir(self.valid_data)
 
+    def test_historical_v01_artifact_still_uses_legacy_schema(self):
+        legacy_path = Path(__file__).parent.parent / "music-ir" / "demo-track-001.music-ir.json"
+        legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+        self.assertEqual(legacy["schema_version"], "music-ir/0.1")
+        validate_music_ir(legacy)
+
     def test_missing_required_top_level_fails(self):
         for required_field in ["schema_version", "track", "global", "structure", "harmony", "audio_features", "provenance", "review"]:
             with self.subTest(field=required_field):

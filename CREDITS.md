@@ -1,70 +1,84 @@
 # Credits and third-party notices
 
-Agent Listening is a small project-specific adapter and evidence-fusion layer.
-It invokes the dependencies below at runtime; it does not vendor their source
-files. Versions are pinned or constrained in [`pyproject.toml`](pyproject.toml)
-and resolved in [`uv.lock`](uv.lock).
+Agent Listening CLI is project-specific adapter, fusion, schema, CLI, receipt, and
+Skill code. It invokes the components below at runtime; it does not copy their
+source trees into this repository. Versions are declared in
+[`pyproject.toml`](pyproject.toml) and resolved in [`uv.lock`](uv.lock).
+
+The project code is released under the MIT License; see [`LICENSE`](LICENSE).
+That project license does not relicense the direct or transitive dependencies,
+model weights, or input audio listed below. Each remains subject to its own
+notice and usage terms.
 
 ## Direct runtime dependencies
 
-| Component | Version | Use in this repository | Upstream and notice |
+| Component | Version | Role here | Upstream and license notice |
 | --- | --- | --- | --- |
-| `all-in-one-infer` | `3.1.0` | Structure, beat, and downbeat observations | [openmirlab/all-in-one-infer](https://github.com/openmirlab/all-in-one-infer) · MIT. The maintained package also links the [original All-In-One project](https://github.com/mir-aidj/all-in-one). |
-| Essentia | `2.1b6.dev1389` | Acoustic, rhythm, tonal, and descriptor observations | [MTG/essentia](https://github.com/MTG/essentia) · AGPL-3.0. Read the upstream [licensing notice](https://github.com/MTG/essentia/blob/master/Essentia%20Licensing.txt) before redistribution or hosted use. |
-| `jams` | `0.3.5` | JAMS serialization and base-schema validation | [marl/jams](https://github.com/marl/jams) · ISC. The format is described in the [JAMS paper](https://archives.ismir.net/ismir2014/paper/000174.pdf). |
-| `jsonschema` | `>=4.23,<5` (lock resolves `4.26.0`) | Draft 2020-12 Music-IR validation | [python-jsonschema/jsonschema](https://github.com/python-jsonschema/jsonschema) · MIT. |
+| `all-in-one-infer` | `3.1.0` | Beat/downbeat and structural candidates in `full_mix` | [source](https://github.com/openmirlab/all-in-one-infer) · [MIT code license](https://github.com/openmirlab/all-in-one-infer/blob/main/LICENSE); see the [original All-In-One project](https://github.com/mir-aidj/all-in-one) and its released model files |
+| Essentia | `2.1b6.dev1389` | Global/frame acoustic, spectral, rhythm, tonal, and continuous-pitch evidence | [source](https://github.com/MTG/essentia) · [AGPL-3.0/licensing notice](https://github.com/MTG/essentia/blob/master/Essentia%20Licensing.txt); model-free DSP runtime |
+| `demucs-infer` | `4.2.2` | `htdemucs_6s` source separation in `full_mix` | [source](https://github.com/openmirlab/demucs-infer) · [MIT code license](https://github.com/openmirlab/demucs-infer/blob/main/LICENSE); model lineage and weight terms are in the [original Demucs project](https://github.com/facebookresearch/demucs) |
+| `basic-pitch` | `0.4.0` | Machine note events and MIDI for solo/stems except drums | [source](https://github.com/spotify/basic-pitch) · [Apache-2.0 code license](https://github.com/spotify/basic-pitch/blob/main/LICENSE); use the upstream model/checkpoint notices for weights |
+| `jams` | `0.3.5` | JAMS serialization and base-schema validation | [source](https://github.com/marl/jams) · [ISC code license](https://github.com/marl/jams/blob/main/LICENSE); format paper at [ISMIR 2014](https://archives.ismir.net/ismir2014/paper/000174.pdf) |
+| `jsonschema` | `>=4.23,<5` | Draft 2020-12 validation of Music IR | [source](https://github.com/python-jsonschema/jsonschema) · [MIT code license](https://github.com/python-jsonschema/jsonschema/blob/main/COPYING) |
+| `setuptools` | `<81` | Compatibility for Basic Pitch's `resampy` import path | [source](https://github.com/pypa/setuptools) · [MIT code license](https://github.com/pypa/setuptools/blob/main/LICENSE); this is a compatibility pin, not an analysis engine |
 
-The table covers direct dependencies only. The full transitive dependency set
-is the lockfile's responsibility; every transitive package remains under its
-own license. Model weights, caches, and audio inputs can carry separate terms
-from the code packages that download or read them.
+The table lists direct dependencies only. The lock file contains transitive
+packages under their own licenses. Model weights, model caches, and input audio
+may carry terms different from the code packages that download or read them;
+review the current upstream and weight notices before redistribution or hosted
+use.
 
-## Development and research references (not runtime dependencies)
+`all-in-one-infer` currently brings `matplotlib` transitively. Agent Listening
+does not directly import it or expose its visualization helpers; removing that
+transitive package would require replacing the upstream runtime dependency.
 
-These projects were inspected while choosing the V0.1 shape. They are credited
-as references only: their source is not copied into this repository and they
-are not installed by `pyproject.toml`.
+## Design references (not runtime dependencies)
 
-| Reference | What was borrowed or deliberately left out |
+These repositories informed the boundary or the shape of a small feature. No
+upstream source is copied, and none is installed by this project:
+
+| Reference | What was used or intentionally excluded |
 | --- | --- |
-| [wx9Songs/MOSS-Music-Data-Pipeline](https://github.com/wx9Songs/MOSS-Music-Data-Pipeline) | Multi-branch perception followed by an explicit merge step informed the evidence-fusion boundary; its large training-data pipeline is not a V0.1 dependency. |
-| [spotify/basic-pitch](https://github.com/spotify/basic-pitch) and [magenta/mt3](https://github.com/magenta/mt3) | Considered for symbolic transcription; MIDI/note artifacts remain intentionally out of scope in V0.1. |
-| [ASLP-lab/SongFormer](https://github.com/ASLP-lab/SongFormer) | Considered for long-form section detection; current structure evidence comes from the pinned all-in-one runtime. |
-| [yizhilll/MERT](https://github.com/yizhilll/MERT), [Tencent-AILab/MuQ](https://github.com/tencent-ailab/muq), and [AMAAI-Lab/MERIT](https://github.com/AMAAI-Lab/MERIT) | Considered as continuous music representations; embeddings are not part of the current artifact contract. |
-| [NVIDIA/audio-flamingo](https://github.com/NVIDIA/audio-flamingo) and [OpenMOSS/MOSS-Music](https://github.com/OpenMOSS/MOSS-Music) | Considered for semantic audio-language assistance; language-model output is not used as ground truth by this pipeline. |
+| [LiZhuoming-lab/soundscape-analyse](https://github.com/LiZhuoming-lab/soundscape-analyse) | Material novelty, before/after evidence, and reviewable change-event ideas; no GUI or whole-repository code. |
+| [ennisaaaaaaaa-stack/ocean-listen](https://github.com/ennisaaaaaaaa-stack/ocean-listen) | Separation-first and per-stem energy/note pipeline ideas; no GUI, orchestrator, or bundled dependency tree. |
+| [FelixNgFender/mu2mi](https://github.com/FelixNgFender/mu2mi) | Product-level comparison around a compact music representation; Web storage, sharing, and cloud-service features are not part of this tool. |
 
-The project's own research record includes an external research session labelled
-“Manus AI” on 2026-08-22 in
-[`Research/mcp_result_d8f1dec8-0732-4f31-911c-9ae123971aa9.json`](Research/mcp_result_d8f1dec8-0732-4f31-911c-9ae123971aa9.json).
-It informed the candidate comparison above; it is not executable code and is
-not presented as authorship of the Agent Listening implementation.
+## Evaluated and not adopted
 
-## Standards and design references
+| Project | Decision |
+| --- | --- |
+| [libAudioFlux/audioFlux](https://github.com/libAudioFlux/audioFlux) | Not added: the current spectral and time-series evidence is already covered by Essentia. |
+| [cuthbertLab/music21](https://github.com/cuthbertLab/music21) | Not added: it consumes symbolic music; it does not create new waveform evidence for this pipeline. |
+| [wx9Songs/MOSS-Music-Data-Pipeline](https://github.com/wx9Songs/MOSS-Music-Data-Pipeline) | Evaluated as a larger data/model pipeline, but not a runtime dependency or source template. |
 
-- **JAMS** supplies the multi-annotation, time-aligned evidence container. The
-  project keeps JAMS as the evidence archive and derives a smaller
-  `music-ir.json` for downstream reasoning; this boundary is recorded in
-  [ADR-0002](docs/adr/0002-dual-artifact-jams-and-music-ir.md).
-- **JSON Schema Draft 2020-12** supplies the schema vocabulary; the local
-  domain schema is [`schemas/music-ir-v0.1.schema.json`](schemas/music-ir-v0.1.schema.json).
-- The dual-engine choice and the static CLI shape are local decisions recorded
-  in [ADR-0001](docs/adr/0001-allin1-essentia-dual-engine.md) and
-  [ADR-0003](docs/adr/0003-static-cli-glue-pipeline.md), informed by the
-  upstream tools' documented capabilities.
-- Earlier architectural exploration is preserved in the project's
-  [`Research/`](Research/) notes. Those notes are references and provenance,
-  not copied upstream implementation code and not additional runtime
-  dependencies.
+## Local standards and implementation boundary
 
-## What this project claims
+- JAMS supplies the multi-annotation, time-aligned evidence container; the
+  compact domain contract is the local `music-ir/0.2` schema.
+- The split between raw observation, normalized evidence, compact inference,
+  and downstream execution is a local design decision recorded in
+  [`docs/adr/`](docs/adr/).
+- The Skill is a thin instruction layer. It does not claim authorship of the
+  upstream tools and does not silently load their raw data into an agent's
+  context.
+- Machine note events are not score ground truth; Basic Pitch amplitude is not
+  loudness. Automatic validation is distinct from human listening approval.
 
-- Upstream tools are credited by name, version, role, and license link above.
-- No upstream repository is represented as the author of Agent Listening's
-  adapters, fusion rules, schema, CLI, receipt format, or Skill text.
-- The receipt distinguishes automatic validation from human listening, and the
-  project does not claim namespace-strict JAMS confidence validation when an
-  extractor does not provide the required numeric confidence.
+## License and release status
 
-This is a provenance record, not legal advice. Before distributing a bundled
-application, container, model cache, or hosted service, review the current
-license and model terms of every included component.
+The project-specific code in this repository is MIT-licensed; the complete
+text is in [`LICENSE`](LICENSE). Third-party notices do not grant a license to
+redistribute or relicense any dependency or model. Review each upstream code,
+model-weight, and input-audio term before redistribution or hosted use.
+
+Adding a license file does not by itself create a published release. This
+checkout remains a locally implemented and tested working tree until an owner
+chooses a version, commits it, and publishes it.
+
+For model-specific terms, consult the upstream weight/release notices before
+redistribution: [All-In-One releases](https://github.com/openmirlab/all-in-one-infer/releases),
+[Demucs model releases](https://github.com/facebookresearch/demucs/releases),
+and [Basic Pitch model/code notices](https://github.com/spotify/basic-pitch/blob/main/LICENSE).
+
+This file is a provenance record, not legal advice. Recheck upstream code,
+model-weight, and transitive dependency terms at release time.

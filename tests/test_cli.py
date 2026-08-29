@@ -1,17 +1,16 @@
 import json
-import io
 from pathlib import Path
-import contextlib
+import subprocess
 import sys
 import tempfile
 from typing import Any, Dict
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from src import analyze, build_ir_from_files
-from src import cli
 from src.adapters.allin1_adapter import AllInOneAdapter
 from src.adapters.essentia_adapter import EssentiaAdapter
+from src.cli import _receipt
 
 
 class TestCLIAndCore(unittest.TestCase):
@@ -96,6 +95,48 @@ class TestCLIAndCore(unittest.TestCase):
                     output_dir=tmpdir,
                 )
 
+    def test_offline_compiler_rejects_allin1_for_solo_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with self.assertRaisesRegex(ValueError, "only valid for full_mix"):
+                build_ir_from_files(
+                    allin1_path=self.allin1_path,
+                    essentia_path=self.essentia_path,
+                    track_id="solo-track",
+                    output_dir=tmpdir,
+                    analysis_mode="solo",
+                )
+
+    def test_receipt_has_absolute_paths_and_capability_statuses(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_dir = Path(tmpdir)
+            _, music_ir = build_ir_from_files(
+                allin1_path=self.allin1_path,
+                essentia_path=self.essentia_path,
+                track_id="receipt-track",
+                source_file=str(out_dir / "source.wav"),
+                output_dir=str(out_dir),
+                created_at="2026-08-23T00:00:00Z",
+            )
+            receipt = _receipt("build-ir", str(out_dir), music_ir)
+            self.assertEqual(receipt["receipt_version"], "agent-listening/0.2")
+            self.assertEqual(receipt["status"], "success")
+            self.assertTrue(Path(receipt["artifacts"]["music_ir"]).is_absolute())
+            self.assertEqual(receipt["capabilities"]["material_events"], "available")
+            self.assertEqual(receipt["validation"]["music_ir"], "passed")
+
+    def test_cli_error_emits_machine_receipt(self):
+        process = subprocess.run(
+            [sys.executable, "-m", "src.cli", "analyze", "/does/not/exist.wav", "--json"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(process.returncode, 1)
+        error_receipt = json.loads(process.stderr)
+        self.assertEqual(error_receipt["receipt_version"], "agent-listening/0.2")
+        self.assertEqual(error_receipt["status"], "error")
+        self.assertEqual(error_receipt["error"]["type"], "FileNotFoundError")
+
     def test_analyze_integration_with_mock_adapters(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -139,19 +180,81 @@ class TestCLIAndCore(unittest.TestCase):
             # Check that analyze returns MusicIR and writes files
             self.assertEqual(music_ir["track"]["id"], "test_song")
             self.assertEqual(music_ir["track"]["analysis_mode"], "solo")
-            self.assertNotIn("symbols", music_ir)
+            self.assertEqual(music_ir["symbols"]["status"], "failed")
             self.assertEqual(
                 music_ir["provenance"]["source"]["sha256"],
                 "73fd3366fce238b05b6657bbf1c676505efca23072a5337e74c34719b1665ffb",
             )
 
             # Verify mock calls
-            mock_allin1.run.assert_called_once()
+            mock_allin1.run.assert_not_called()
             mock_essentia.run.assert_called_once()
 
             # Verify files on disk
             self.assertTrue((tmp_path / "music-ir" / "test_song.music-ir.json").exists())
             self.assertTrue((tmp_path / "jams" / "test_song.analysis.jams").exists())
+
+    def test_full_mix_routes_allin1_demucs_and_skips_drum_transcription(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            audio = tmp_path / "full_mix.wav"
+            audio.write_bytes(b"RIFFdummywavdata")
+            drum_stem = tmp_path / "drums.wav"
+            drum_stem.write_bytes(b"RIFFdummy-drum-stem")
+
+            with open(self.allin1_path, "r", encoding="utf-8") as f:
+                allin1_fixture = json.load(f)
+            with open(self.essentia_path, "r", encoding="utf-8") as f:
+                essentia_fixture = json.load(f)
+
+            mock_allin1 = MagicMock(spec=AllInOneAdapter)
+            mock_allin1.run.side_effect = lambda _audio, output: Path(output).write_text(
+                json.dumps(allin1_fixture), encoding="utf-8"
+            ) or allin1_fixture
+            mock_allin1.parse_output.return_value = AllInOneAdapter().parse_output(allin1_fixture)
+
+            mock_essentia = MagicMock(spec=EssentiaAdapter)
+            def run_essentia(_audio_path, _profile_path, output_path):
+                Path(output_path).write_text(json.dumps(essentia_fixture), encoding="utf-8")
+                return essentia_fixture
+
+            mock_essentia.run.side_effect = run_essentia
+            mock_essentia.parse_output.return_value = EssentiaAdapter().parse_output(
+                essentia_fixture, profile_name="essentia_v0_1"
+            )
+
+            mock_demucs = MagicMock()
+            mock_demucs.model = "htdemucs_6s"
+            mock_demucs.run.return_value = {
+                "tool": "demucs-infer",
+                "version": "4.2.2",
+                "model": "htdemucs_6s",
+                "stems": [{"id": "drums", "role": "drums", "path": str(drum_stem)}],
+            }
+
+            mock_pitch = MagicMock()
+            mock_notes = MagicMock()
+            ir = analyze(
+                str(audio),
+                output_dir=str(tmp_path / "output"),
+                analysis_mode="full_mix",
+                created_at="2026-08-23T00:00:00Z",
+                allin1_adapter=mock_allin1,
+                essentia_adapter=mock_essentia,
+                demucs_adapter=mock_demucs,
+                basic_pitch_adapter=mock_notes,
+            )
+
+            mock_allin1.run.assert_called_once()
+            mock_demucs.run.assert_called_once()
+            mock_notes.run.assert_not_called()
+            self.assertEqual(ir["sources"][0]["id"], "drums")
+            self.assertEqual(ir["sources"][0]["notes"]["status"], "not_applicable")
+            self.assertTrue((tmp_path / "output" / "stems" / "full_mix" / "drums.wav").exists())
+            self.assertTrue((tmp_path / "output" / "raw" / "full_mix" / "stems" / "drums.essentia.json").exists())
+            manifest = json.loads((tmp_path / "output" / "raw" / "full_mix" / "demucs-manifest.json").read_text())
+            self.assertEqual(manifest["stems"][0]["path"], "stems/full_mix/drums.wav")
+            self.assertEqual(manifest["stems"][0]["extracted_path"], str(drum_stem))
 
     def test_failed_extractor_leaves_no_partial_raw_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -174,51 +277,6 @@ class TestCLIAndCore(unittest.TestCase):
                 )
 
             self.assertFalse((tmp_path / "raw" / "failure").exists())
-
-    def test_cli_json_receipt_is_compact_and_absolute(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            stdout = io.StringIO()
-            argv = [
-                "cli.py",
-                "build-ir",
-                "--allin1", self.allin1_path,
-                "--essentia", self.essentia_path,
-                "--track-id", "receipt-test",
-                "--output-dir", str(output_dir),
-                "--json",
-            ]
-            with patch.object(sys, "argv", argv), contextlib.redirect_stdout(stdout):
-                cli.main()
-
-            receipt = json.loads(stdout.getvalue())
-            self.assertEqual(receipt["receipt_version"], "agent-listening/0.1")
-            self.assertEqual(receipt["status"], "success")
-            self.assertEqual(receipt["command"], "build-ir")
-            self.assertEqual(receipt["track_id"], "receipt-test")
-            self.assertTrue(Path(receipt["artifacts"]["music_ir"]).is_absolute())
-            self.assertTrue(Path(receipt["artifacts"]["jams"]).is_absolute())
-            self.assertIsNone(receipt["artifacts"]["raw_dir"])
-            self.assertEqual(receipt["validation"]["human_listening"], "pending")
-
-    def test_cli_json_error_is_machine_readable(self):
-        stderr = io.StringIO()
-        argv = [
-            "cli.py",
-            "build-ir",
-            "--allin1", self.allin1_path,
-            "--essentia", self.essentia_path,
-            "--track-id", "../escape",
-            "--json",
-        ]
-        with patch.object(sys, "argv", argv), contextlib.redirect_stderr(stderr):
-            with self.assertRaises(SystemExit) as raised:
-                cli.main()
-
-        self.assertEqual(raised.exception.code, 1)
-        receipt = json.loads(stderr.getvalue())
-        self.assertEqual(receipt["status"], "error")
-        self.assertEqual(receipt["error"]["type"], "ValueError")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# Specification: Audio-to-Music-IR V0.1 Pipeline
+# Specification: Audio-to-Music-IR V0.1 Pipeline (historical)
 
 ## 1. Goal
 
@@ -19,3 +19,12 @@ Provide a lightweight, robust, deterministic CLI pipeline to convert mixed music
 - `02-allin1-adapter.md` (Blocked by: None)
 - `03-fusion-and-schema-validator.md` (Blocked by: 01, 02)
 - `04-cli-runner-and-end-to-end.md` (Blocked by: 03)
+
+## V0.2 implementation addendum
+
+The released working contract is now `music-ir/0.2`: Essentia native frame
+time grids, separate loudness/low-level/tonal JAMS grids, deterministic
+material-change candidates, optional Essentia pitch and Basic Pitch symbols,
+and Demucs-backed `full_mix` source records. The public integration remains
+the thin CLI/Skill boundary documented in the repository README; v0.1 remains
+the validation path for historical fixtures.
