@@ -12,6 +12,13 @@ agent-listening analyze "/absolute/path/to/audio.wav" \
   --output-dir "/absolute/path/to/job-output" --json
 ```
 
+Install this thin Skill project-locally in
+`<audio-project>/.agents/skills/agent-listening` when one project needs it; use
+`$HOME/.agents/skills/agent-listening` only when several projects should
+discover it. The Skill is a trigger and reading policy, not a copy of the
+repository or its raw artifacts. The CLI may be called through the repository's
+`bin/agent-listening` wrapper or a PATH symlink.
+
 Read the JSON receipt first. It gives the track ID, absolute artifact paths,
 automatic validation status, and whether human listening is still pending.
 
