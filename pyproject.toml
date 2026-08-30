@@ -2,7 +2,9 @@
 name = "agent-listening-cli"
 version = "0.2.0"
 description = "Deterministic Agent Listening CLI for audio-to-Music-IR analysis"
-license = { file = "LICENSE" }
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "all-in-one-infer==3.1.0",
@@ -13,6 +15,25 @@ dependencies = [
   "jsonschema[format]>=4.23,<5",
   "setuptools<81",
 ]
+
+[project.urls]
+Repository = "https://github.com/Bayern99/Agent-Listening-CLI"
+Issues = "https://github.com/Bayern99/Agent-Listening-CLI/issues"
+
+[project.scripts]
+agent-listening = "src.cli:main"
+
+[build-system]
+requires = ["setuptools<81"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.setuptools.data-files]
+"profiles" = ["profiles/*.yaml"]
+"schemas" = ["schemas/*.json"]
 
 [tool.uv]
 package = false

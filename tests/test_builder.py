@@ -94,6 +94,32 @@ class TestFusionBuilder(unittest.TestCase):
         self.assertIsNone(ir["structure"]["sections"][0]["loudness_lufs"])
         self.assertIsNone(ir["structure"]["sections"][0]["spectral_centroid_hz"])
         self.assertIsNone(ir["structure"]["sections"][0]["dynamic_complexity"])
+        self.assertIsNone(ir["structure"]["sections"][0]["spectral_rolloff_hz"])
+        self.assertIsNone(ir["structure"]["sections"][0]["pitch_median_hz"])
+        self.assertIsNone(ir["structure"]["sections"][0]["hpcp_mean"])
+
+    def test_gapped_sections_are_kept_raw_but_not_published(self):
+        allin1 = AllInOneEvidence(
+            duration_s=10.0,
+            sections=[
+                {"start_s": 0.0, "end_s": 4.0, "label": "verse", "tool": "allin1"},
+                {"start_s": 5.0, "end_s": 10.0, "label": "chorus", "tool": "allin1"},
+            ],
+            raw_sha256="a" * 64,
+        )
+        _, ir = merge_evidence(
+            allin1_evidence=allin1,
+            essentia_evidence=EssentiaEvidence(
+                duration_s=10.0,
+                raw_sha256="b" * 64,
+                profile_sha256="c" * 64,
+            ),
+            track_id="gapped-sections",
+            source_file="source/gapped-sections.wav",
+        )
+
+        self.assertEqual(ir["capabilities"]["functional_sections"], "not_detected")
+        self.assertEqual(ir["structure"]["sections"], [])
 
     def test_section_loudness_does_not_reuse_lowlevel_grid(self):
         evidence = EssentiaEvidence(
@@ -123,6 +149,53 @@ class TestFusionBuilder(unittest.TestCase):
         )
         self.assertIsNone(ir["structure"]["sections"][0]["loudness_lufs"])
         self.assertIsNotNone(ir["structure"]["sections"][0]["spectral_centroid_hz"])
+
+    def test_sections_aggregate_spectral_pitch_and_tonal_grids(self):
+        evidence = EssentiaEvidence(
+            duration_s=2.0,
+            raw_sha256="b" * 64,
+            profile_sha256="c" * 64,
+            frame_features={
+                "timestamps_s": [0.25, 0.75, 1.25, 1.75],
+                "spectral_rolloff_hz": [100.0, 200.0, 300.0, 400.0],
+                "spectral_energyband_high": [1.0, 3.0, 5.0, 7.0],
+                "pitch_salience": [0.2, 0.4, 0.6, 0.8],
+                "tonal_timestamps_s": [0.5, 1.5],
+                "hpcp": [[1.0] + [0.0] * 11, [0.0, 1.0] + [0.0] * 10],
+            },
+        )
+        allin1 = AllInOneEvidence(
+            duration_s=2.0,
+            raw_sha256="a" * 64,
+            sections=[
+                {"start_s": 0.0, "end_s": 1.0, "label": "verse", "tool": "allin1"},
+                {"start_s": 1.0, "end_s": 2.0, "label": "chorus", "tool": "allin1"},
+            ],
+        )
+        pitch = {
+            "status": "available",
+            "contour": [
+                {"time_s": 0.5, "frequency_hz": 110.0, "voiced_probability": 0.9},
+                {"time_s": 0.75, "frequency_hz": None, "voiced_probability": 0.0},
+                {"time_s": 1.5, "frequency_hz": 220.0, "voiced_probability": 0.8},
+            ],
+        }
+        _, ir = merge_evidence(
+            allin1_evidence=allin1,
+            essentia_evidence=evidence,
+            track_id="local-grids",
+            source_file="source/local-grids.wav",
+            pitch=pitch,
+        )
+
+        first, second = ir["structure"]["sections"]
+        self.assertEqual(first["spectral_rolloff_hz"], 150.0)
+        self.assertEqual(second["spectral_energyband_high"], 6.0)
+        self.assertEqual(first["pitch_median_hz"], 110.0)
+        self.assertEqual(first["voiced_ratio"], 0.5)
+        self.assertEqual(second["voiced_ratio"], 1.0)
+        self.assertEqual(first["hpcp_mean"], [1.0] + [0.0] * 11)
+        self.assertEqual(second["hpcp_mean"], [0.0, 1.0] + [0.0] * 10)
 
     def test_key_arbitration_in_fusion(self):
         _, ir = merge_evidence(
@@ -204,6 +277,26 @@ class TestFusionBuilder(unittest.TestCase):
         self.assertEqual(ir["capabilities"]["material_events"], "available")
         self.assertTrue(any("loudness_change" in event["changed_features"] for event in ir["structure"]["material_events"]))
 
+    def test_material_events_ignore_a_smooth_linear_ramp(self):
+        evidence = EssentiaEvidence(
+            duration_s=1.2,
+            raw_sha256="b" * 64,
+            profile_sha256="c" * 64,
+            frame_features={
+                "timestamps_s": [index / 10 for index in range(13)],
+                "spectral_flux": [float(index) for index in range(13)],
+            },
+        )
+        _, ir = merge_evidence(
+            allin1_evidence=AllInOneEvidence(raw_sha256="a" * 64),
+            essentia_evidence=evidence,
+            track_id="smooth-ramp",
+            source_file="source/smooth-ramp.wav",
+            duration_s=1.2,
+        )
+
+        self.assertEqual(ir["structure"]["material_events"], [])
+
     def test_jams_keeps_lowlevel_loudness_and_tonal_grids_separate(self):
         evidence = EssentiaEvidence(
             duration_s=1.0,
@@ -260,15 +353,43 @@ class TestFusionBuilder(unittest.TestCase):
     def test_jams_keeps_source_pitch_and_note_identity(self):
         source = {
             "id": "vocals",
+            "role": "vocals",
+            "audio_file": "stems/source-evidence/vocals.wav",
+            "source_sha256": "d" * 64,
+            "duration_s": 1.0,
+            "activity": {
+                "status": "available",
+                "loudness_lufs": -20.0,
+                "energy": 0.1,
+                "onset_rate_per_s": 1.0,
+            },
+            "extractor": {
+                "tool": "essentia",
+                "version": "2.1",
+                "profile": "essentia_v0_1",
+                "source_sha256": "d" * 64,
+                "raw_json": "raw/source-evidence/stems/vocals.essentia.json",
+                "raw_sha256": "e" * 64,
+                "status": "available",
+            },
+            "separation": {
+                "tool": "demucs-infer",
+                "version": "4.2.2",
+                "model": "htdemucs_6s",
+            },
+            "status": "available",
             "pitch": {
+                "status": "available",
                 "tool": "essentia.pitch_yin_probabilistic",
                 "version": "2.1",
                 "contour": [{"time_s": 0.0, "frequency_hz": 440.0, "voiced_probability": 0.9}],
             },
             "notes": {
+                "status": "available",
                 "tool": "basic-pitch",
                 "version": "0.4.0",
                 "notes": [{"start_s": 0.0, "duration_s": 0.5, "midi_pitch": 69, "confidence": None}],
+                "ground_truth": False,
             },
         }
         jams, _ = merge_evidence(

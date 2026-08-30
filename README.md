@@ -12,14 +12,14 @@ The names are intentionally split:
 
 | Thing | Stable name | Meaning |
 | --- | --- | --- |
-| Project/lock metadata | `agent-listening-cli` | The name in `pyproject.toml` and `uv.lock`; no PyPI publication is implied. |
+| Distribution | `agent-listening-cli` | The installable Python distribution and GitHub Release asset. |
 | Executable | `agent-listening` | The supported command-line interface. |
 | Agent Skill | `agent-listening` | The thin instruction folder under `.agents/skills/`. |
 
-The checkout can therefore be renamed or symlinked without breaking existing
-commands. The supported integration surface is the CLI; the Skill is a small
-discovery and progressive-disclosure layer around that CLI. There is no MCP
-server to configure.
+The checkout can therefore be renamed or symlinked without breaking source
+development. The supported integration surface is the installed CLI; the Skill
+is a small discovery and progressive-disclosure layer around that CLI. There is
+no MCP server to configure.
 
 ## Product boundary
 
@@ -28,7 +28,7 @@ The pipeline is deliberately small and explicit:
 - local execution; no cloud service, account, or local web server;
 - deterministic MIR extractors for acoustic and structural observations;
 - raw observations, normalized evidence, and compact inference kept separate;
-- atomic, no-clobber artifact writes by default;
+- staged, no-clobber artifact writes with rollback on ordinary commit failures;
 - a machine-readable receipt before any deeper artifact is opened;
 - timestamps that let a person audition a claim in an external player or DAW;
 - no claim that automatic notes, key, sections, or source separation are human
@@ -44,7 +44,7 @@ extractor payloads remain available when a question actually needs them.
 audio file
     │
     ▼
-bin/agent-listening  ── locked uv environment ──►  src.cli
+installed `agent-listening` console script  ──►  src.cli
                                                      │
                                                      ▼
                                              src.core orchestrator
@@ -70,12 +70,16 @@ bin/agent-listening  ── locked uv environment ──►  src.cli
                                      thin Skill → downstream music agent
 ```
 
+`bin/agent-listening` remains a checkout convenience for contributors. A user
+project calls the installed console script, so the command works independently
+of the Agent Listening repository's location.
+
 The implementation follows four layers:
 
 | Layer | What it contains | Where to look |
 | --- | --- | --- |
 | Observation | Tool-native frame arrays and model output | `src/adapters/`, `raw/` |
-| Evidence | Time grids, provenance, confidence, normalized events | `src/fusion/`, JAMS |
+| Evidence | Timestamped feature grids, provenance, confidence, normalized events | `src/fusion/`, JAMS |
 | Inference | Compact summaries and capability statuses | `schemas/`, Music IR |
 | Execution | CLI invocation and agent handoff | `bin/`, `src/cli.py`, Skill |
 
@@ -105,25 +109,67 @@ An audio project does not need a copy of this source tree. Keep one checkout
 as the authority and expose only the Skill and/or wrapper that the project
 needs.
 
-### 1. Prepare the authority checkout once
+### 1. Install the CLI once
 
-From this repository:
-
-```bash
-uv sync --locked
-```
-
-The wrapper is self-contained and resolves this checkout even when called from
-another directory:
+The planned `v0.2.0` GitHub Release is the installation authority for this
+version. Once that tag is published, install it into an isolated tool
+environment and expose the stable command on `PATH`:
 
 ```bash
-"/absolute/path/to/Agent Listening/bin/agent-listening" --help
+uv tool install \
+  "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
+agent-listening --version
+agent-listening doctor --analysis-mode solo --json
 ```
 
-### 2. Choose Skill scope
+If `uv` is not available, `pipx` is the compatible fallback:
 
-Project-local is the default: use it when one audio project should explicitly
-own the integration.
+```bash
+pipx install \
+  "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
+```
+
+The project is not published to PyPI in this release. Do not use an unpinned
+branch or an unverified checkout for a reproducible Agent environment.
+
+`doctor` is a quick installation check. It checks Python, required package
+metadata, module discovery, packaged schemas/profiles, and output writability;
+it deliberately does not download model weights or run audio inference.
+
+### 2. Install the Skill at the right scope
+
+The CLI and Skill are independent. Install the CLI once; install the Skill
+where the Agent host discovers it.
+
+For one audio project, run this from the project root:
+
+```bash
+gh skill install Bayern99/Agent-Listening-CLI \
+  .agents/skills/agent-listening/SKILL.md \
+  --allow-hidden-dirs \
+  --agent codex \
+  --scope project \
+  --pin v0.2.0
+```
+
+For several local projects that should intentionally share one pinned Skill:
+
+```bash
+gh skill install Bayern99/Agent-Listening-CLI \
+  .agents/skills/agent-listening/SKILL.md \
+  --allow-hidden-dirs \
+  --agent codex \
+  --scope user \
+  --pin v0.2.0
+```
+
+`gh skill` is currently a preview command. If the host does not support it,
+use a symlink to the tagged checkout as the fallback. Project scope is the
+default for explicit ownership and reproducibility; user scope is for deliberate
+multi-project discovery. Never copy the Agent Listening source tree into an
+audio project.
+
+Fallback symlink for one project:
 
 ```bash
 REPO="/absolute/path/to/Agent Listening"
@@ -137,42 +183,8 @@ ln -s "$REPO/.agents/skills/agent-listening" \
   "$AUDIO_PROJECT/.agents/skills/agent-listening"
 ```
 
-Global discovery is appropriate when several local projects should all use the
-same checkout and the same Skill version:
-
-```bash
-REPO="/absolute/path/to/Agent Listening"
-mkdir -p "$HOME/.agents/skills"
-test ! -e "$HOME/.agents/skills/agent-listening" || {
-  echo "destination already exists; inspect it before replacing" >&2
-  exit 1
-}
-ln -s "$REPO/.agents/skills/agent-listening" \
-  "$HOME/.agents/skills/agent-listening"
-```
-
-Use project-local scope when reproducibility and explicit ownership matter;
-use global scope only when the same local authority is intentionally shared.
-Do not copy Agent Listening into every project. A real copy is a conscious
-portability trade-off and will otherwise drift from the authority checkout.
-
-### 3. Expose the CLI when convenient
-
-The Skill does not replace the executable. Agents and scripts can call the
-wrapper directly, or you can put one separate symlink on `PATH`:
-
-```bash
-REPO="/absolute/path/to/Agent Listening"
-mkdir -p "$HOME/.local/bin"
-test ! -e "$HOME/.local/bin/agent-listening" || {
-  echo "destination already exists; inspect it before replacing" >&2
-  exit 1
-}
-ln -s "$REPO/bin/agent-listening" "$HOME/.local/bin/agent-listening"
-```
-
-This checkout is the supported installation form today. It is not a claim
-that a PyPI package or a system-wide binary has been published.
+The checkout wrapper `bin/agent-listening` is for contributors who are
+developing the repository itself; it is not the normal downstream integration.
 
 ### 4. Run an analysis into the project output area
 
@@ -237,6 +249,25 @@ not render a GUI, waveform page, or spectrogram image.
 
 ## CLI reference
 
+Check the installed environment before an expensive first run or after an
+upgrade:
+
+```bash
+agent-listening doctor --analysis-mode solo --json
+agent-listening doctor --analysis-mode full_mix --json
+```
+
+`doctor` exits `0` only when the selected mode's package, executable, resource,
+and output checks are ready. It does not load model weights, download anything,
+or prove perceptual correctness. Its `limitations` field records those omitted
+checks.
+
+Print the installed distribution version without importing the analysis stack:
+
+```bash
+agent-listening --version
+```
+
 The official interface is:
 
 ```text
@@ -267,12 +298,13 @@ uv run --locked python -m src.cli build-ir \
   --json
 ```
 
-An error with `--json` exits non-zero and emits an error receipt on stderr.
+An error with `--json` exits non-zero and emits one error receipt on stdout;
+extractor progress and diagnostics remain on stderr.
 Do not treat a partially existing output directory as a successful analysis.
 
 ## Artifact contract
 
-Each successful run writes atomically beneath the requested output directory:
+Each successful run stages the complete track artifact set before replacing it:
 
 ```text
 output/
@@ -301,7 +333,7 @@ in JAMS/raw instead of entering every downstream prompt.
 
 Important evidence rules:
 
-- section acoustic summaries use a legal local time grid; if none exists, the
+- section acoustic summaries use a legal local feature timeline; if none exists, the
   value is `null`, never a copied whole-track value;
 - material events are machine candidates with before/after windows, not human
   labels;
@@ -309,7 +341,8 @@ Important evidence rules:
 - Basic Pitch amplitude/velocity is not loudness;
 - weak key, beat, or section candidates remain available as raw evidence but
   are not upgraded to a deterministic fact;
-- `review.human_checked` stays pending until a person listens.
+- `review.human_checked` stays `false` until a person listens; the receipt's
+  `validation.human_listening` stays `pending`.
 
 ## Verification
 
@@ -323,13 +356,35 @@ uv run --locked python -m unittest discover -v
 uv run --locked python -m compileall -q src tests
 bin/agent-listening --help
 bin/agent-listening analyze --help
+uv build
 git diff --check
+```
+
+After `uv build`, verify the actual distribution outside the checkout. CI uses
+the same sequence: install the wheel into an isolated environment, change to a
+temporary directory, then run `agent-listening --version`, both mode-specific
+doctor checks, and an installed `build-ir --json` fixture smoke. A source-tree
+`python -m src.cli` run is not a release-installation check.
+
+For a local wheel smoke with an already-synchronised environment:
+
+```bash
+uv pip install --python .venv/bin/python --no-deps dist/*.whl
+SMOKE_DIR="$(mktemp -d)"
+(
+  cd "$SMOKE_DIR"
+  PATH="/absolute/path/to/Agent Listening/.venv/bin:$PATH" \
+    agent-listening --version
+  PATH="/absolute/path/to/Agent Listening/.venv/bin:$PATH" \
+    agent-listening doctor --analysis-mode solo --json
+)
 ```
 
 The test suite covers adapter parsing, native timestamp grids, local section
 aggregation, material-event timing, mode routing, Basic Pitch preservation,
 Demucs manifests, schema compatibility, receipt/no-clobber behavior, and
-atomic artifacts. Music IR uses Draft 2020-12 JSON Schema; JAMS uses the
+staged artifacts and rollback on ordinary commit failures. Music IR uses Draft
+2020-12 JSON Schema; JAMS uses the
 official base schema. A strict confidence claim is not made where an
 extractor did not provide numeric confidence for every observation.
 
@@ -390,15 +445,20 @@ source trees into this repository.
 
 The references that shaped the boundary are credited separately from runtime
 dependencies: soundscape-analyse informed material-change review ideas,
-Ocean Listen informed separation-first/per-stem thinking, and Mu2Mi informed
-the compact representation comparison. audioFlux and music21 were evaluated
-but not added. Their names and links are not claims of code reuse.
+Ocean Listen informed separation-first/per-stem thinking, Mu2Mi informed the
+compact representation comparison, OpenCLI informed the small `doctor` and
+structured-envelope adoption check, and CLI-Anything informed the installed
+command and real-artifact verification checklist. audioFlux and music21 were
+evaluated but not added. Their names and links are not claims of code reuse;
+no source tree or generated harness is copied.
 
 The MIT file makes the project terms explicit; it does not mean that a model,
-input recording, or transitive package can be redistributed under MIT. This
-checkout is technically implemented and locally tested, but no commit, push,
-package publication, or public release is implied by the presence of the
-license file.
+input recording, or transitive package can be redistributed under MIT. The
+`v0.2.0` distribution is intended to ship through GitHub Release assets; PyPI
+is not a release channel for this version. Until that release exists, use a
+reviewed checkout or the exact commit supplied by the maintainer. Once
+published, check the exact release commit and attached checksums when
+installing outside this repository.
 
 ## Deliberate non-goals
 

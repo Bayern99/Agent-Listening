@@ -4,6 +4,8 @@ Provides the minimal public interface for the audio-to-music-ir system.
 """
 
 from datetime import datetime, timezone
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 from pathlib import Path
@@ -16,6 +18,7 @@ from src.adapters.basic_pitch_adapter import BasicPitchAdapter
 from src.adapters.demucs_adapter import DemucsAdapter
 from src.adapters.essentia_adapter import EssentiaAdapter
 from src.fusion.builder import merge_evidence
+from src.resources import resource_path
 
 
 def _sha256_file(path: Path) -> str:
@@ -39,6 +42,37 @@ def _assert_writable(paths: Tuple[Path, ...], overwrite: bool) -> None:
         raise FileExistsError(f"Refusing to overwrite existing artifact: {existing[0]}")
 
 
+def _managed_paths(output_dir: str, track_id: str) -> Tuple[Path, ...]:
+    jams_file, ir_file = _artifact_paths(output_dir, track_id)
+    base = Path(output_dir)
+    return (
+        jams_file,
+        ir_file,
+        base / "raw" / track_id,
+        base / "stems" / track_id,
+        base / "symbols" / track_id,
+    )
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+@contextmanager
+def _track_lock(output_dir: str, track_id: str):
+    lock_path = Path(output_dir) / f".{track_id}.agent-listening.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
 def _write_artifacts(
     jams_data: Dict[str, Any],
     music_ir: Dict[str, Any],
@@ -50,41 +84,65 @@ def _write_artifacts(
 ) -> None:
     jams_file, ir_file = _artifact_paths(output_dir, track_id)
     raw_files = raw_files or {}
-    raw_destinations = {
-        name: Path(output_dir) / "raw" / track_id / f"{name}.json"
-        for name in raw_files
-    }
     artifact_files = artifact_files or {}
-    artifact_destinations = {Path(relative): source for relative, source in artifact_files.items()}
-    extra_destinations = [Path(output_dir) / relative for relative in artifact_destinations]
-    _assert_writable((jams_file, ir_file, *raw_destinations.values(), *extra_destinations), overwrite)
-
     out_base = Path(output_dir)
     out_base.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(dir=out_base, prefix=f".{track_id}-commit-") as temp_dir:
         stage = Path(temp_dir)
-        staged_jams = stage / jams_file.name
-        staged_ir = stage / ir_file.name
+        staged_root = stage / "output"
+        staged_jams = staged_root / "jams" / jams_file.name
+        staged_ir = staged_root / "music-ir" / ir_file.name
+        staged_jams.parent.mkdir(parents=True, exist_ok=True)
+        staged_ir.parent.mkdir(parents=True, exist_ok=True)
         staged_jams.write_text(json.dumps(jams_data, indent=2, ensure_ascii=False), encoding="utf-8")
         staged_ir.write_text(json.dumps(music_ir, indent=2, ensure_ascii=False), encoding="utf-8")
-        staged_raw = {}
         for name, source in raw_files.items():
-            staged_raw[name] = stage / f"{name}.json"
-            staged_raw[name].parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, staged_raw[name])
-
-        destinations = [(staged_jams, jams_file), (staged_ir, ir_file)]
-        destinations.extend((staged_raw[name], destination) for name, destination in raw_destinations.items())
-        staged_extra = {}
-        for relative, source in artifact_destinations.items():
-            staged_extra[relative] = stage / relative
-            destinations.append((staged_extra[relative], Path(output_dir) / relative))
-            staged_extra[relative].parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, staged_extra[relative])
-        for _, destination in destinations:
+            relative = Path(f"{name}.json")
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError(f"Unsafe raw artifact path: {name}")
+            destination = staged_root / "raw" / track_id / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-        for source, destination in destinations:
-            source.replace(destination)
+            shutil.copy2(source, destination)
+        for relative_name, source in artifact_files.items():
+            relative = Path(relative_name)
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError(f"Unsafe artifact path: {relative_name}")
+            destination = staged_root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+
+        managed = _managed_paths(output_dir, track_id)
+        staged = (
+            staged_jams,
+            staged_ir,
+            staged_root / "raw" / track_id,
+            staged_root / "stems" / track_id,
+            staged_root / "symbols" / track_id,
+        )
+        backup_root = stage / "backup"
+        with _track_lock(output_dir, track_id):
+            _assert_writable(managed, overwrite)
+            backups: Dict[Path, Path] = {}
+            installed: List[Path] = []
+            try:
+                for destination in managed:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    if destination.exists() or destination.is_symlink():
+                        backup = backup_root / destination.relative_to(out_base)
+                        backup.parent.mkdir(parents=True, exist_ok=True)
+                        destination.replace(backup)
+                        backups[destination] = backup
+                for source, destination in zip(staged, managed):
+                    if source.exists():
+                        source.replace(destination)
+                        installed.append(destination)
+            except Exception:
+                for destination in installed:
+                    _remove_path(destination)
+                for destination, backup in backups.items():
+                    if backup.exists() or backup.is_symlink():
+                        backup.replace(destination)
+                raise
 
 
 def build_ir_from_files(
@@ -120,9 +178,7 @@ def build_ir_from_files(
     if allin1_ev is not None and allin1_path:
         allin1_ev.raw_sha256 = _sha256_file(Path(allin1_path))
     essentia_ev.raw_sha256 = _sha256_file(Path(essentia_path))
-    profile_path = Path(__file__).parent.parent / "profiles" / f"{profile_name}.yaml"
-    if not profile_path.exists():
-        raise FileNotFoundError(f"Essentia profile not found: {profile_path}")
+    profile_path = resource_path("profiles", f"{profile_name}.yaml")
     essentia_ev.profile_sha256 = _sha256_file(profile_path)
 
     if created_at is None:
@@ -176,10 +232,10 @@ def analyze(
     raw_dir = out_base / "raw" / track_id
     essentia_raw_path = raw_dir / "essentia.json"
     jams_file, ir_file = _artifact_paths(output_dir, track_id)
-    _assert_writable((essentia_raw_path, jams_file, ir_file), overwrite)
+    _assert_writable(_managed_paths(output_dir, track_id), overwrite)
 
     if profile_path is None:
-        profile_path = str(Path(__file__).parent.parent / "profiles" / f"{profile}.yaml")
+        profile_path = str(resource_path("profiles", f"{profile}.yaml"))
     profile_file = Path(profile_path)
     if not profile_file.exists():
         raise FileNotFoundError(f"Essentia profile not found: {profile_path}")
@@ -217,6 +273,13 @@ def analyze(
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(json.dumps(value, indent=2), encoding="utf-8")
 
+        def _version(adapter: Any) -> str:
+            try:
+                value = adapter.version()
+                return value if isinstance(value, str) else "unknown"
+            except Exception:
+                return "unknown"
+
         def _run_pitch(source_path: Path, source_id: str) -> Optional[Dict[str, Any]]:
             raw_pitch_path = Path(temp_dir) / f"{source_id}.pitch.json"
             try:
@@ -233,8 +296,15 @@ def analyze(
                 return result
             # ponytail: pitch is optional; keep acoustic evidence when the
             # codec or native algorithm cannot read one source.
-            except Exception:
-                return {"status": "failed", "tool": "essentia.pitch_yin_probabilistic", "contour": [], "artifact": None}
+            except Exception as exc:
+                return {
+                    "status": "failed",
+                    "tool": "essentia.pitch_yin_probabilistic",
+                    "version": _version(adapter_essentia),
+                    "contour": [],
+                    "artifact": None,
+                    "error": {"type": type(exc).__name__, "message": str(exc)},
+                }
 
         def _run_notes(source_path: Path, source_id: str) -> Dict[str, Any]:
             adapter_notes = basic_pitch_adapter or BasicPitchAdapter()
@@ -244,14 +314,15 @@ def analyze(
                     raise TypeError("Basic Pitch adapter must return a mapping")
             # ponytail: note extraction is optional; preserve the primary IR when
             # a model, codec, or input format is unavailable.
-            except Exception:
+            except Exception as exc:
                 return {
                     "status": "failed",
                     "tool": "basic-pitch",
-                    "version": "unknown",
+                    "version": _version(adapter_notes),
                     "notes": [],
                     "artifacts": [],
                     "ground_truth": False,
+                    "error": {"type": type(exc).__name__, "message": str(exc)},
                 }
             note_artifacts = BasicPitchAdapter.artifact_paths(result)
             notes_path = note_artifacts["notes"]
@@ -357,11 +428,15 @@ def analyze(
                             "timestamp_semantics": stem_ev.frame_features.get("time_basis", {}),
                         }
                         raw_files[f"stems/{stem_id}.essentia"] = stem_raw_path
-                    except Exception:
+                    except Exception as exc:
                         # Optional per-stem evidence must not erase successful
                         # separation or other stems; the status stays explicit.
-                        stem_record["status"] = "failed"
+                        stem_record["activity"]["status"] = "failed"
                         stem_record["extractor"]["status"] = "failed"
+                        stem_record["extractor"]["error"] = {
+                            "type": type(exc).__name__,
+                            "message": str(exc),
+                        }
                     if stem_id != "drums":
                         stem_record["pitch"] = _run_pitch(stem_path, stem_id)
                         stem_record["notes"] = _run_notes(stem_path, stem_id)
@@ -397,6 +472,7 @@ def analyze(
                         ),
                         "0.4.0",
                     ),
+                    duration_s=essentia_ev.duration_s,
                 )
                 symbols = {
                     **note_summary,
@@ -408,7 +484,7 @@ def analyze(
                 failure_manifest = {
                     "tool": "demucs-infer",
                     "model": getattr(separator, "model", "htdemucs_6s"),
-                    "version": "4.2.2",
+                    "version": _version(separator),
                     "status": "failed",
                     "error": str(exc),
                 }
@@ -420,6 +496,7 @@ def analyze(
                 raw_paths["demucs_model"] = failure_manifest["model"]
                 raw_paths["demucs_sha256"] = _sha256_file(manifest_path)
                 raw_paths["demucs_status"] = "failed"
+                raw_paths["demucs_error"] = failure_manifest["error"]
                 symbols = {"status": "not_applicable", "notes": [], "artifacts": [], "ground_truth": False}
 
         if created_at is None:

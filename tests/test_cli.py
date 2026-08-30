@@ -1,11 +1,13 @@
 import json
+import io
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 from typing import Any, Dict
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src import analyze, build_ir_from_files
 from src.adapters.allin1_adapter import AllInOneAdapter
@@ -85,6 +87,41 @@ class TestCLIAndCore(unittest.TestCase):
                 overwrite=True,
             )
 
+    def test_overwrite_rolls_back_if_commit_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_dir = Path(tmpdir)
+            build_ir_from_files(
+                allin1_path=self.allin1_path,
+                essentia_path=self.essentia_path,
+                track_id="rollback-track",
+                output_dir=str(out_dir),
+                created_at="2026-08-23T00:00:00Z",
+            )
+            ir_path = out_dir / "music-ir" / "rollback-track.music-ir.json"
+            jams_path = out_dir / "jams" / "rollback-track.analysis.jams"
+            original_ir = ir_path.read_bytes()
+            original_jams = jams_path.read_bytes()
+            real_replace = Path.replace
+
+            def fail_on_staged_ir(source, destination):
+                if "output" in source.parts and source.name == "rollback-track.music-ir.json":
+                    raise OSError("injected commit failure")
+                return real_replace(source, destination)
+
+            with patch.object(Path, "replace", autospec=True, side_effect=fail_on_staged_ir):
+                with self.assertRaisesRegex(OSError, "injected commit failure"):
+                    build_ir_from_files(
+                        allin1_path=self.allin1_path,
+                        essentia_path=self.essentia_path,
+                        track_id="rollback-track",
+                        output_dir=str(out_dir),
+                        created_at="2026-08-23T00:00:01Z",
+                        overwrite=True,
+                    )
+
+            self.assertEqual(ir_path.read_bytes(), original_ir)
+            self.assertEqual(jams_path.read_bytes(), original_jams)
+
     def test_build_ir_rejects_unsafe_track_id(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assertRaises(ValueError):
@@ -132,10 +169,127 @@ class TestCLIAndCore(unittest.TestCase):
             check=False,
         )
         self.assertEqual(process.returncode, 1)
-        error_receipt = json.loads(process.stderr)
+        error_receipt = json.loads(process.stdout)
         self.assertEqual(error_receipt["receipt_version"], "agent-listening/0.2")
         self.assertEqual(error_receipt["status"], "error")
         self.assertEqual(error_receipt["error"]["type"], "FileNotFoundError")
+
+    def test_version_flag_is_available_without_a_subcommand(self):
+        process = subprocess.run(
+            [sys.executable, "-m", "src.cli", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(process.stdout.strip(), "agent-listening 0.2.0")
+
+    def test_doctor_solo_json_is_a_single_machine_document(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "src.cli",
+                    "doctor",
+                    "--analysis-mode",
+                    "solo",
+                    "--output-dir",
+                    tmpdir,
+                    "--json",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertEqual(process.returncode, 0, process.stderr)
+        report = json.loads(process.stdout)
+        self.assertEqual(report["schema_version"], "agent-listening-doctor/0.1")
+        self.assertEqual(report["analysis_mode"], "solo")
+        self.assertEqual(report["status"], "ready")
+        self.assertIn("dependency.essentia", {check["id"] for check in report["checks"]})
+        self.assertIn("dependency.basic-pitch", {check["id"] for check in report["checks"]})
+        self.assertIn("model_weights_not_loaded", report["limitations"])
+        self.assertEqual(process.stdout.count("\n"), 1)
+
+    def test_doctor_full_mix_includes_full_mix_dependencies(self):
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "src.cli",
+                "doctor",
+                "--analysis-mode",
+                "full_mix",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(process.returncode, 0, process.stderr)
+        report = json.loads(process.stdout)
+        check_ids = {check["id"] for check in report["checks"]}
+        self.assertIn("dependency.all-in-one-infer", check_ids)
+        self.assertIn("dependency.demucs-infer", check_ids)
+
+    def test_doctor_reports_unwritable_output_without_creating_analysis_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = Path(tmpdir) / "not-a-directory"
+            output_file.write_text("occupied", encoding="utf-8")
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "src.cli",
+                    "doctor",
+                    "--analysis-mode",
+                    "solo",
+                    "--output-dir",
+                    str(output_file),
+                    "--json",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertEqual(process.returncode, 1)
+        report = json.loads(process.stdout)
+        self.assertEqual(report["status"], "not_ready")
+        failures = [check for check in report["checks"] if check["status"] == "failed"]
+        self.assertTrue(any(check.get("code") == "output_not_writable" for check in failures))
+
+    def test_json_error_receipt_stays_parseable_after_extractor_chatter(self):
+        def noisy_failure(**_kwargs):
+            print("extractor progress")
+            raise RuntimeError("extractor failed")
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with patch("src.cli.analyze", side_effect=noisy_failure), patch.object(
+            sys, "argv", ["agent-listening", "analyze", "audio.wav", "--json"]
+        ), redirect_stdout(stdout), redirect_stderr(stderr), self.assertRaises(SystemExit):
+            from src.cli import main
+            main()
+
+        self.assertEqual(json.loads(stdout.getvalue())["status"], "error")
+        self.assertIn("extractor progress", stderr.getvalue())
+
+    def test_receipt_reads_stems_before_raw_evidence(self):
+        receipt = _receipt(
+            "analyze",
+            ".",
+            {
+                "track": {"id": "mix"},
+                "capabilities": {},
+                "review": {"human_checked": False},
+                "symbols": {"artifacts": ["symbols/mix/vocals.mid"]},
+                "sources": [{"audio_file": "stems/mix/vocals.wav"}],
+            },
+            raw_dir=True,
+        )
+
+        self.assertEqual(receipt["next"], ["music_ir", "jams", "symbols", "stems", "raw_dir"])
 
     def test_analyze_integration_with_mock_adapters(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -165,6 +319,11 @@ class TestCLIAndCore(unittest.TestCase):
 
             mock_essentia.run.side_effect = run_essentia
             mock_essentia.parse_output.return_value = EssentiaAdapter().parse_output(essentia_fixture, profile_name="essentia_v0_1")
+            mock_essentia.run_pitch.side_effect = RuntimeError("pitch unavailable")
+            mock_essentia.version.return_value = "2.1b6"
+            mock_notes = MagicMock()
+            mock_notes.run.side_effect = RuntimeError("notes unavailable")
+            mock_notes.version.return_value = "0.4.0"
 
             # Call top-level analyze
             music_ir = analyze(
@@ -175,12 +334,22 @@ class TestCLIAndCore(unittest.TestCase):
                 created_at="2026-08-23T00:00:00Z",
                 allin1_adapter=mock_allin1,
                 essentia_adapter=mock_essentia,
+                basic_pitch_adapter=mock_notes,
             )
 
             # Check that analyze returns MusicIR and writes files
             self.assertEqual(music_ir["track"]["id"], "test_song")
             self.assertEqual(music_ir["track"]["analysis_mode"], "solo")
             self.assertEqual(music_ir["symbols"]["status"], "failed")
+            self.assertEqual(music_ir["symbols"]["version"], "0.4.0")
+            self.assertEqual(music_ir["symbols"]["error"]["type"], "RuntimeError")
+            self.assertEqual(music_ir["pitch"]["error"]["message"], "pitch unavailable")
+            failed_runs = {
+                run["id"]: run for run in music_ir["provenance"]["extractor_runs"]
+                if run["status"] == "failed"
+            }
+            self.assertEqual(failed_runs["essentia.pitch"]["error"]["type"], "RuntimeError")
+            self.assertEqual(failed_runs["basic-pitch"]["error"]["message"], "notes unavailable")
             self.assertEqual(
                 music_ir["provenance"]["source"]["sha256"],
                 "73fd3366fce238b05b6657bbf1c676505efca23072a5337e74c34719b1665ffb",
@@ -256,6 +425,27 @@ class TestCLIAndCore(unittest.TestCase):
             self.assertEqual(manifest["stems"][0]["path"], "stems/full_mix/drums.wav")
             self.assertEqual(manifest["stems"][0]["extracted_path"], str(drum_stem))
 
+            mock_essentia.run_pitch.side_effect = RuntimeError("no pitch")
+            mock_notes.run.side_effect = RuntimeError("no notes")
+            analyze(
+                str(audio),
+                output_dir=str(tmp_path / "output"),
+                analysis_mode="solo",
+                created_at="2026-08-23T00:00:01Z",
+                essentia_adapter=mock_essentia,
+                basic_pitch_adapter=mock_notes,
+                overwrite=True,
+            )
+
+            self.assertFalse((tmp_path / "output" / "stems" / "full_mix").exists())
+            self.assertFalse((tmp_path / "output" / "symbols" / "full_mix").exists())
+            self.assertFalse((tmp_path / "output" / "raw" / "full_mix" / "allin1.json").exists())
+            self.assertFalse((tmp_path / "output" / "raw" / "full_mix" / "demucs-manifest.json").exists())
+            self.assertEqual(
+                sorted(path.name for path in (tmp_path / "output" / "raw" / "full_mix").iterdir()),
+                ["essentia.json"],
+            )
+
     def test_failed_extractor_leaves_no_partial_raw_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -277,6 +467,55 @@ class TestCLIAndCore(unittest.TestCase):
                 )
 
             self.assertFalse((tmp_path / "raw" / "failure").exists())
+
+    def test_stem_analysis_failure_preserves_available_source_identity(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            audio = tmp_path / "mix.wav"
+            stem = tmp_path / "vocals.wav"
+            audio.write_bytes(b"RIFFmix")
+            stem.write_bytes(b"RIFFvocals")
+            allin1_fixture = json.loads(Path(self.allin1_path).read_text())
+            essentia_fixture = json.loads(Path(self.essentia_path).read_text())
+
+            allin1 = MagicMock(spec=AllInOneAdapter)
+            allin1.run.side_effect = lambda _audio, output: Path(output).write_text(
+                json.dumps(allin1_fixture), encoding="utf-8"
+            ) or allin1_fixture
+            allin1.parse_output.return_value = AllInOneAdapter().parse_output(allin1_fixture)
+            essentia = MagicMock(spec=EssentiaAdapter)
+
+            def run_essentia(input_path, _profile, output):
+                if input_path == str(stem):
+                    raise RuntimeError("stem analysis failed")
+                Path(output).write_text(json.dumps(essentia_fixture), encoding="utf-8")
+                return essentia_fixture
+
+            essentia.run.side_effect = run_essentia
+            essentia.parse_output.return_value = EssentiaAdapter().parse_output(essentia_fixture)
+            essentia.run_pitch.side_effect = RuntimeError("pitch failed")
+            essentia.version.return_value = "2.1b6"
+            demucs = MagicMock()
+            demucs.model = "htdemucs_6s"
+            demucs.run.return_value = {
+                "tool": "demucs-infer", "version": "4.2.2", "model": "htdemucs_6s",
+                "stems": [{"id": "vocals", "role": "vocals", "path": str(stem)}],
+            }
+            notes = MagicMock()
+            notes.run.side_effect = RuntimeError("notes failed")
+            notes.version.return_value = "0.4.0"
+
+            ir = analyze(
+                str(audio), output_dir=str(tmp_path / "output"), analysis_mode="full_mix",
+                allin1_adapter=allin1, essentia_adapter=essentia,
+                demucs_adapter=demucs, basic_pitch_adapter=notes,
+            )
+
+            source = ir["sources"][0]
+            self.assertEqual(source["status"], "available")
+            self.assertEqual(source["activity"]["status"], "failed")
+            self.assertEqual(source["extractor"]["status"], "failed")
+            self.assertEqual(source["extractor"]["error"]["message"], "stem analysis failed")
 
 
 if __name__ == "__main__":

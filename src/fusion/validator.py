@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 
+from src.resources import resource_path
+
 
 class ValidationError(Exception):
     """Raised when Music IR validation fails against schema."""
@@ -20,7 +22,7 @@ _CACHED_SCHEMAS: Dict[str, Dict[str, Any]] = {}
 
 def load_schema(schema_path: Optional[str] = None) -> Dict[str, Any]:
     """Load JSON Schema from disk or cache."""
-    target_path = Path(schema_path) if schema_path else Path(__file__).parent.parent.parent / "schemas" / "music-ir-v0.2.schema.json"
+    target_path = Path(schema_path) if schema_path else resource_path("schemas", "music-ir-v0.2.schema.json")
     cache_key = str(target_path)
     if cache_key in _CACHED_SCHEMAS:
         return _CACHED_SCHEMAS[cache_key]
@@ -35,7 +37,7 @@ def validate_music_ir(data: Dict[str, Any], schema: Optional[Dict[str, Any]] = N
     if schema is None:
         version = data.get("schema_version", "music-ir/0.2")
         schema_name = "music-ir-v0.1.schema.json" if version == "music-ir/0.1" else "music-ir-v0.2.schema.json"
-        schema = load_schema(str(Path(__file__).parent.parent.parent / "schemas" / schema_name))
+        schema = load_schema(str(resource_path("schemas", schema_name)))
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     try:

@@ -42,6 +42,8 @@ upstream source is copied, and none is installed by this project:
 | [LiZhuoming-lab/soundscape-analyse](https://github.com/LiZhuoming-lab/soundscape-analyse) | Material novelty, before/after evidence, and reviewable change-event ideas; no GUI or whole-repository code. |
 | [ennisaaaaaaaa-stack/ocean-listen](https://github.com/ennisaaaaaaaa-stack/ocean-listen) | Separation-first and per-stem energy/note pipeline ideas; no GUI, orchestrator, or bundled dependency tree. |
 | [FelixNgFender/mu2mi](https://github.com/FelixNgFender/mu2mi) | Product-level comparison around a compact music representation; Web storage, sharing, and cloud-service features are not part of this tool. |
+| [jackwener/OpenCLI](https://github.com/jackwener/OpenCLI) | Small `doctor`, structured-envelope, command-discovery, and compact-first ideas; no source or runtime dependency. The upstream project is Apache-2.0. |
+| [HKUDS/CLI-Anything](https://github.com/HKUDS/CLI-Anything) | Interface archaeology, installed-command smoke, real-backend and semantic-artifact verification checklist; no generated harness, source, or runtime dependency. The upstream project is Apache-2.0. |
 
 ## Evaluated and not adopted
 
@@ -50,6 +52,10 @@ upstream source is copied, and none is installed by this project:
 | [libAudioFlux/audioFlux](https://github.com/libAudioFlux/audioFlux) | Not added: the current spectral and time-series evidence is already covered by Essentia. |
 | [cuthbertLab/music21](https://github.com/cuthbertLab/music21) | Not added: it consumes symbolic music; it does not create new waveform evidence for this pipeline. |
 | [wx9Songs/MOSS-Music-Data-Pipeline](https://github.com/wx9Songs/MOSS-Music-Data-Pipeline) | Evaluated as a larger data/model pipeline, but not a runtime dependency or source template. |
+
+OpenCLI and CLI-Anything are design references only. Agent Listening does not
+depend on either project, does not invoke either generator, and does not claim
+that their interfaces or implementation are part of this codebase.
 
 ## Local standards and implementation boundary
 
@@ -71,9 +77,11 @@ text is in [`LICENSE`](LICENSE). Third-party notices do not grant a license to
 redistribute or relicense any dependency or model. Review each upstream code,
 model-weight, and input-audio term before redistribution or hosted use.
 
-Adding a license file does not by itself create a published release. This
-checkout remains a locally implemented and tested working tree until an owner
-chooses a version, commits it, and publishes it.
+The planned `v0.2.0` release will be distributed through GitHub Release assets
+and a pinned Git URL; PyPI is intentionally not a release channel for this
+version. Until that release is created, this checkout is the technical source
+and no public release is claimed. A GitHub Release does not relicense model
+weights, input recordings, or transitive packages.
 
 For model-specific terms, consult the upstream weight/release notices before
 redistribution: [All-In-One releases](https://github.com/openmirlab/all-in-one-infer/releases),

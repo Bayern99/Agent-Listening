@@ -37,6 +37,8 @@ source/*
 !source/.gitkeep
 raw/*
 !raw/.gitkeep
+jams/*.analysis.jams
+music-ir/*.music-ir.json
 
 # IDE and Editor
 .idea/

@@ -62,7 +62,7 @@ class DemucsAdapter:
             )
         manifest = {
             "tool": "demucs-infer",
-            "version": self._version(),
+            "version": self.version(),
             "model": self.model,
             "audio_path": str(audio_path),
             "source_sha256": self._sha256(Path(audio_path)),
@@ -72,7 +72,7 @@ class DemucsAdapter:
         return manifest
 
     @staticmethod
-    def _version() -> str:
+    def version() -> str:
         try:
             return version("demucs-infer")
         except PackageNotFoundError:

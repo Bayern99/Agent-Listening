@@ -20,7 +20,8 @@ def _aggregate_section_acoustics(
     start_s: float,
     end_s: float,
     frame_features: Dict[str, Any],
-) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    pitch: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Slice frame features within [start_s, end_s] and compute local mean statistics."""
     timestamps = frame_features.get("timestamps_s", [])
     # Loudness has its own EBU momentary grid.  A missing grid is unknown,
@@ -34,7 +35,7 @@ def _aggregate_section_acoustics(
             return []
         indices = [
             index for index, timestamp in enumerate(value_timestamps)
-            if start_s <= timestamp <= end_s
+            if start_s <= timestamp < end_s
         ]
         if not indices:
             return []
@@ -53,11 +54,53 @@ def _aggregate_section_acoustics(
     else:
         sec_complexity = None
 
-    return (
-        round(sec_loudness, 2) if sec_loudness is not None else None,
-        round(sec_centroid, 2) if sec_centroid is not None else None,
-        sec_complexity,
+    result = {
+        "loudness_lufs": round(sec_loudness, 2) if sec_loudness is not None else None,
+        "spectral_centroid_hz": round(sec_centroid, 2) if sec_centroid is not None else None,
+        "dynamic_complexity": sec_complexity,
+    }
+    for name in (
+        "spectral_rolloff_hz", "spectral_spread_hz", "spectral_flatness",
+        "spectral_entropy", "spectral_energy", "spectral_energyband_low",
+        "spectral_energyband_middle_low", "spectral_energyband_middle_high",
+        "spectral_energyband_high", "dissonance", "pitch_salience",
+    ):
+        values = _slice(frame_features.get(name, []), timestamps)
+        result[name] = round(sum(values) / len(values), 4) if values else None
+
+    contour = (pitch or {}).get("contour", [])
+    local_contour = [
+        point for point in contour
+        if start_s <= float(point.get("time_s", -1.0)) < end_s
+    ]
+    local_pitch = [
+        point for point in local_contour
+        if isinstance(point.get("frequency_hz"), (int, float))
+        and point["frequency_hz"] > 0
+    ]
+    result["pitch_median_hz"] = (
+        round(median(point["frequency_hz"] for point in local_pitch), 4)
+        if local_pitch else None
     )
+    result["voiced_ratio"] = (
+        round(sum(
+            1 for point in local_contour
+            if isinstance(point.get("frequency_hz"), (int, float))
+            and point["frequency_hz"] > 0
+            and point.get("voiced_probability", 0) > 0
+        ) / len(local_contour), 4)
+        if local_contour else None
+    )
+
+    tonal_timestamps = frame_features.get("tonal_timestamps_s", [])
+    hpcp_rows = frame_features.get("hpcp", [])
+    local_hpcp = _slice(hpcp_rows, tonal_timestamps)
+    result["hpcp_mean"] = (
+        [round(sum(column) / len(column), 4) for column in zip(*local_hpcp)]
+        if local_hpcp and all(len(row) == len(local_hpcp[0]) for row in local_hpcp)
+        else None
+    )
+    return result
 
 
 def _usable_allin1(evidence: AllInOneEvidence) -> bool:
@@ -71,7 +114,7 @@ def _usable_allin1(evidence: AllInOneEvidence) -> bool:
     )
 
 
-def _usable_sections(evidence: AllInOneEvidence) -> bool:
+def _usable_sections(evidence: AllInOneEvidence, duration_s: Optional[float] = None) -> bool:
     valid_sections = [
         section for section in evidence.sections
         if isinstance(section.get("start_s"), (int, float))
@@ -80,9 +123,18 @@ def _usable_sections(evidence: AllInOneEvidence) -> bool:
         and section["end_s"] > section["start_s"]
     ]
     labels = {str(section.get("label", "")).lower() for section in valid_sections}
+    continuous = all(
+        abs(current["start_s"] - previous["end_s"]) <= 1e-3
+        for previous, current in zip(valid_sections, valid_sections[1:])
+    )
+    within_duration = duration_s is None or all(
+        section["end_s"] <= duration_s + 1e-3 for section in valid_sections
+    )
     return (
         len(valid_sections) == len(evidence.sections)
         and len(valid_sections) >= 2
+        and continuous
+        and within_duration
         and not labels.issubset({"start", "intro", "end"})
     )
 
@@ -144,7 +196,7 @@ def _material_events(frame_features: Dict[str, Any], duration_s: float) -> List[
             # keeps the fixed 1.2 threshold useful without changing the raw
             # evidence or inventing a confidence score.
             scale = (median(non_zero) / 2.0) if non_zero else 1.0
-        normalized_deltas[name] = [value / scale for value in deltas]
+        normalized_deltas[name] = [max(0.0, value - center) / scale for value in deltas]
 
     scores = [
         sum(normalized_deltas[name][index] for name in candidate_names) / len(candidate_names)
@@ -205,7 +257,7 @@ def build_music_ir(
         raw_paths = {}
 
     has_metric_grid = _usable_allin1(allin1_evidence)
-    has_functional_sections = _usable_sections(allin1_evidence)
+    has_functional_sections = _usable_sections(allin1_evidence, duration_s)
     material_events = _material_events(essentia_evidence.frame_features, duration_s)
     material_event_inputs = bool(_material_event_series(essentia_evidence.frame_features))
 
@@ -237,10 +289,11 @@ def build_music_ir(
     sections = []
     source_sections = allin1_evidence.sections if has_functional_sections else []
     for sec in source_sections:
-        sec_loudness, sec_centroid, sec_complexity = _aggregate_section_acoustics(
+        local_acoustics = _aggregate_section_acoustics(
             start_s=sec["start_s"],
             end_s=sec["end_s"],
             frame_features=essentia_evidence.frame_features,
+            pitch=pitch,
         )
         sections.append({
             "start_s": sec["start_s"],
@@ -248,9 +301,7 @@ def build_music_ir(
             "label": sec["label"],
             "tool": sec["tool"],
             "confidence": sec.get("confidence"),
-            "loudness_lufs": sec_loudness,
-            "spectral_centroid_hz": sec_centroid,
-            "dynamic_complexity": sec_complexity,
+            **local_acoustics,
         })
     if sections:
         sections[0]["start_s"] = 0.0
@@ -359,6 +410,7 @@ def build_music_ir(
         "status", "tool", "version", "pitch_range_midi", "median_midi",
         "voiced_ratio", "note_count", "note_density_per_s",
         "pitch_class_distribution", "artifact", "source_sha256", "raw_sha256",
+        "error",
     }
     pitch_ir = {
         key: value for key, value in (pitch or {
@@ -390,6 +442,7 @@ def build_music_ir(
         "pitch_range_midi", "pitch_class_distribution", "amplitude_is_not_loudness",
         "artifacts", "ground_truth",
         "source_id", "source_sha256", "raw_sha256",
+        "error",
     }
     for source in sources or []:
         source_copy = dict(source)
@@ -409,36 +462,45 @@ def build_music_ir(
             "ground_truth": False,
         }).items() if key in source_note_fields
     }
-    if pitch:
-        provenance["extractor_runs"].append({
-            "id": "essentia.pitch",
-            "tool": pitch.get("tool", "essentia.pitch_yin_probabilistic"),
-            "version": pitch.get("version", "unknown"),
+
+    def _pitch_run(run_id: str, evidence: Dict[str, Any], fallback_hash: Optional[str]) -> Dict[str, Any]:
+        return {
+            "id": run_id,
+            "tool": evidence.get("tool", "essentia.pitch_yin_probabilistic"),
+            "version": evidence.get("version", "unknown"),
             "model": None,
             "parameters": {"frame_size": 2048, "hop_size": 1024, "sample_rate_hz": 44100},
-            "source_sha256": pitch.get("source_sha256", source_sha256),
-            "status": pitch.get("status", "unknown"),
-            "raw_json": pitch.get("artifact"),
-            "raw_sha256": pitch.get("raw_sha256"),
+            "source_sha256": evidence.get("source_sha256", fallback_hash),
+            "status": evidence.get("status", "failed"),
+            "raw_json": evidence.get("artifact"),
+            "raw_sha256": evidence.get("raw_sha256"),
             "timestamp_semantics": "frame index × hop_size / sample_rate_hz",
-        })
-    if symbols and not sources and analysis_mode != "full_mix":
-        symbol_raw_json = symbols.get("raw_json") or symbols.get("notes_path")
-        if not symbol_raw_json and symbols.get("artifacts"):
-            symbol_raw_json = symbols["artifacts"][0]
-        provenance["extractor_runs"].append({
-            "id": "basic-pitch",
-            "tool": symbols.get("tool", "basic-pitch"),
-            "version": symbols.get("version", "unknown"),
-            "model": symbols.get("model", "basic-pitch-default"),
+            "error": evidence.get("error"),
+        }
+
+    def _note_run(run_id: str, evidence: Dict[str, Any], fallback_hash: Optional[str]) -> Dict[str, Any]:
+        raw_json = evidence.get("raw_json") or evidence.get("notes_path")
+        if not raw_json and evidence.get("artifacts"):
+            raw_json = evidence["artifacts"][0]
+        return {
+            "id": run_id,
+            "tool": evidence.get("tool", "basic-pitch"),
+            "version": evidence.get("version", "unknown"),
+            "model": evidence.get("model", "basic-pitch-default"),
             "parameters": {},
-            "source_sha256": symbols.get("source_sha256", source_sha256),
-            "status": symbols.get("status", "unknown"),
-            "artifacts": symbols.get("artifacts", []),
-            "raw_json": symbol_raw_json,
-            "raw_sha256": symbols.get("raw_sha256"),
+            "source_sha256": evidence.get("source_sha256", fallback_hash),
+            "status": evidence.get("status", "failed"),
+            "artifacts": evidence.get("artifacts", []),
+            "raw_json": raw_json,
+            "raw_sha256": evidence.get("raw_sha256"),
             "timestamp_semantics": "note start/end are seconds in the source audio",
-        })
+            "error": evidence.get("error"),
+        }
+
+    if pitch:
+        provenance["extractor_runs"].append(_pitch_run("essentia.pitch", pitch, source_sha256))
+    if symbols and not sources and analysis_mode != "full_mix":
+        provenance["extractor_runs"].append(_note_run("basic-pitch", symbols, source_sha256))
     for source in sources or []:
         source_id = str(source.get("id", "source"))
         source_hash = source.get("source_sha256", source_sha256)
@@ -456,44 +518,23 @@ def build_music_ir(
                 "raw_json": source_extractor.get("raw_json"),
                 "raw_sha256": source_extractor.get("raw_sha256"),
                 "timestamp_semantics": source_extractor.get("timestamp_semantics", {}),
+                "error": source_extractor.get("error"),
             })
         source_pitch = source.get("pitch")
         if isinstance(source_pitch, dict):
-            provenance["extractor_runs"].append({
-                "id": f"essentia.pitch.{source_id}",
-                "tool": source_pitch.get("tool", "essentia.pitch_yin_probabilistic"),
-                "version": source_pitch.get("version", "unknown"),
-                "model": None,
-                "parameters": {"frame_size": 2048, "hop_size": 1024, "sample_rate_hz": 44100},
-                "source_sha256": source_pitch.get("source_sha256", source_hash),
-                "status": source_pitch.get("status", "unknown"),
-                "raw_json": source_pitch.get("artifact"),
-                "raw_sha256": source_pitch.get("raw_sha256"),
-                "timestamp_semantics": "frame index × hop_size / sample_rate_hz",
-            })
+            provenance["extractor_runs"].append(
+                _pitch_run(f"essentia.pitch.{source_id}", source_pitch, source_hash)
+            )
         source_notes = source.get("notes")
         if isinstance(source_notes, dict) and source_notes.get("status") != "not_applicable":
-            note_raw_json = source_notes.get("raw_json") or source_notes.get("notes_path")
-            if not note_raw_json and source_notes.get("artifacts"):
-                note_raw_json = source_notes["artifacts"][0]
-            provenance["extractor_runs"].append({
-                "id": f"basic-pitch.{source_id}",
-                "tool": source_notes.get("tool", "basic-pitch"),
-                "version": source_notes.get("version", "unknown"),
-                "model": source_notes.get("model", "basic-pitch-default"),
-                "parameters": {},
-                "source_sha256": source_notes.get("source_sha256", source_hash),
-                "status": source_notes.get("status", "unknown"),
-                "artifacts": source_notes.get("artifacts", []),
-                "raw_json": note_raw_json,
-                "raw_sha256": source_notes.get("raw_sha256"),
-                "timestamp_semantics": "note start/end are seconds in the source audio",
-            })
+            provenance["extractor_runs"].append(
+                _note_run(f"basic-pitch.{source_id}", source_notes, source_hash)
+            )
     if raw_paths.get("demucs"):
         provenance["extractor_runs"].append({
             "id": "demucs",
             "tool": "demucs-infer",
-            "version": raw_paths.get("demucs_version", "4.2.2"),
+            "version": raw_paths.get("demucs_version", "unknown"),
             "model": raw_paths.get("demucs_model", "htdemucs_6s"),
             "parameters": {"device": "cpu", "float32": True},
             "source_sha256": source_sha256,
@@ -501,6 +542,7 @@ def build_music_ir(
             "raw_json": raw_paths["demucs"],
             "raw_sha256": raw_paths.get("demucs_sha256"),
             "timestamp_semantics": "stem samples retain source timeline",
+            "error": raw_paths.get("demucs_error"),
         })
 
     music_ir = {
@@ -607,7 +649,7 @@ def build_jams(
     jam.file_metadata.duration = round(duration_s, 2)
     jam.file_metadata.identifiers = {"track_id": track_id}
 
-    if _usable_sections(allin1_evidence):
+    if _usable_sections(allin1_evidence, duration_s):
         annotation = jams_library.Annotation(
             namespace="segment_open",
             time=0,
