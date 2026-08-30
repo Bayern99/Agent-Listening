@@ -9,10 +9,14 @@ The distribution is `agent-listening-cli`; the stable executable and Skill name
 are both `agent-listening`. For v0.2.0, install the CLI from the pinned GitHub
 Release tag; the Skill is installed separately at project or user scope.
 
+The v0.2.0 environment requires CPython 3.11. Basic Pitch 0.4.0 does not have
+a compatible TensorFlow macOS wheel for CPython 3.13, so always select the
+3.11 interpreter explicitly.
+
 Use the installed CLI as the only integration surface:
 
 ```bash
-uv tool install "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
+uv tool install --python 3.11 "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
 agent-listening --version
 agent-listening doctor --analysis-mode solo --json
 ```

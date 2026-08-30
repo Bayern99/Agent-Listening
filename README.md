@@ -115,8 +115,12 @@ The published [`v0.2.0` GitHub Release](https://github.com/Bayern99/Agent-Listen
 is the installation authority for this version. Install it into an isolated
 tool environment and expose the stable command on `PATH`:
 
+`v0.2.0` requires CPython 3.11. This is intentional: Basic Pitch 0.4.0 has
+no compatible TensorFlow macOS wheel for CPython 3.13. The explicit `--python`
+flag also prevents `uv` from resolving against an incompatible system Python.
+
 ```bash
-uv tool install \
+uv tool install --python 3.11 \
   "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
 agent-listening --version
 agent-listening doctor --analysis-mode solo --json
@@ -125,7 +129,7 @@ agent-listening doctor --analysis-mode solo --json
 If `uv` is not available, `pipx` is the compatible fallback:
 
 ```bash
-pipx install \
+pipx install --python python3.11 \
   "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
 ```
 
