@@ -141,6 +141,9 @@ pipx install --python python3.11 \
 ### 2. 按正确作用域安装 Skill
 
 CLI 和 Skill 分开安装。CLI 安装一次；Skill 安装到 Agent host 能发现的位置。
+当前 v0.2.0 CLI 对应的已审查 Skill contract 固定在 commit
+`4dfa5177b7ecd21dd8cbe5860f1ae37fb8f987c2`；不可变的 v0.2.0 release tag
+早于这次只改 Skill 的修订。
 
 只给一个音频项目使用时，在项目根目录执行：
 
@@ -150,7 +153,7 @@ gh skill install Bayern99/Agent-Listening-CLI \
   --allow-hidden-dirs \
   --agent codex \
   --scope project \
-  --pin v0.2.0
+  --pin 4dfa5177b7ecd21dd8cbe5860f1ae37fb8f987c2
 ```
 
 多个本地项目有意共享同一个 pinned Skill 时：
@@ -161,12 +164,13 @@ gh skill install Bayern99/Agent-Listening-CLI \
   --allow-hidden-dirs \
   --agent codex \
   --scope user \
-  --pin v0.2.0
+  --pin 4dfa5177b7ecd21dd8cbe5860f1ae37fb8f987c2
 ```
 
-`gh skill` 目前仍是 preview 命令。若当前 Agent host 不支持它，再使用 tagged
-checkout 的 symlink fallback。项目级适合明确归属和复现；user 级适合有意共享
-多个项目。不要把 Agent Listening 源代码复制进音频项目。
+`gh skill` 目前仍是 preview 命令。若当前 Agent host 不支持它，再使用包含同一
+已审查 Skill commit 的 checkout 作为 symlink fallback。项目级适合明确归属和
+复现；user 级适合有意共享多个项目。不要把 Agent Listening 源代码复制进音频
+项目。
 
 一个项目的 symlink fallback：
 
