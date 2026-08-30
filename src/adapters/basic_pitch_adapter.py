@@ -20,9 +20,14 @@ class BasicPitchAdapter:
             return "unknown"
 
     @staticmethod
+    def version() -> str:
+        return BasicPitchAdapter._version()
+
+    @staticmethod
     def parse_note_events(
         note_events: Iterable[Tuple[Any, ...]],
         tool_version: str = "unknown",
+        duration_s: Optional[float] = None,
     ) -> Dict[str, Any]:
         notes: List[Dict[str, Any]] = []
         for event in note_events:
@@ -52,7 +57,7 @@ class BasicPitchAdapter:
             notes.append(note)
 
         pitches = [note["midi_pitch"] for note in notes]
-        duration_s = max((note["end_s"] for note in notes), default=0.0)
+        analysis_duration_s = duration_s or max((note["end_s"] for note in notes), default=0.0)
         pitch_classes = [0] * 12
         for pitch in pitches:
             pitch_classes[pitch % 12] += 1
@@ -65,7 +70,7 @@ class BasicPitchAdapter:
             "version": tool_version,
             "notes": notes,
             "note_count": len(notes),
-            "note_density_per_s": round(len(notes) / duration_s, 4) if duration_s else 0.0,
+            "note_density_per_s": round(len(notes) / analysis_duration_s, 4) if analysis_duration_s else 0.0,
             "pitch_range_midi": [min(pitches), max(pitches)] if pitches else None,
             "pitch_class_distribution": pitch_class_distribution,
             "midi_path": None,
@@ -95,7 +100,12 @@ class BasicPitchAdapter:
         model_output, midi_data, note_events = predict(audio_path)
         del model_output
         output_path = Path(output_dir)
-        data = self.parse_note_events(note_events, tool_version=self._version())
+        try:
+            import soundfile as sf
+            duration_s = float(sf.info(audio_path).duration)
+        except Exception:
+            duration_s = None
+        data = self.parse_note_events(note_events, tool_version=self.version(), duration_s=duration_s)
         data["model"] = "basic-pitch-default"
         data["audio_path"] = str(audio_path)
         if data["notes"]:

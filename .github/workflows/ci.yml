@@ -20,3 +20,33 @@ jobs:
       - run: uv run python -m unittest discover -v
       - run: uv run python -m compileall -q src tests
       - run: uv lock --check
+      - name: Build distribution
+        run: uv build
+      - name: Install and smoke the wheel outside the checkout
+        shell: bash
+        run: |
+          uv pip install --python .venv/bin/python --no-deps dist/*.whl
+          smoke_dir=$(mktemp -d)
+          cd "$smoke_dir"
+          export PATH="$GITHUB_WORKSPACE/.venv/bin:$PATH"
+          test "$(agent-listening --version)" = "agent-listening 0.2.0"
+          agent-listening doctor --analysis-mode solo --json > doctor-solo.json
+          agent-listening doctor --analysis-mode full_mix --json > doctor-full.json
+          agent-listening build-ir \
+            --allin1 "$GITHUB_WORKSPACE/tests/fixtures/allin1_sample.json" \
+            --essentia "$GITHUB_WORKSPACE/tests/fixtures/essentia_sample.json" \
+            --track-id installed-smoke \
+            --output-dir "$smoke_dir/output" \
+            --json > receipt.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          doctor = json.loads(Path("doctor-solo.json").read_text())
+          assert doctor["status"] == "ready", doctor
+          receipt = json.loads(Path("receipt.json").read_text())
+          assert receipt["status"] == "success", receipt
+          assert Path(receipt["artifacts"]["music_ir"]).is_file()
+          assert Path(receipt["artifacts"]["jams"]).is_file()
+          print("installed wheel smoke passed")
+          PY

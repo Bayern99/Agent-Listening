@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schema_version": "music-ir/0.1",
   "track": {
     "id": "demo-track-001",
@@ -138,6 +139,12 @@
       "status": "optional_chordino_or_other_aligner_required"
     }
   },
+  "symbols": {
+    "enabled": false,
+    "note_events_csv": null,
+    "midi_file": null,
+    "caveat": "Disabled by default for full mix audio (ADR-0007)."
+  },
   "audio_features": {
     "loudness_ebu128_integrated_lufs": -13.4,
     "loudness_range_lu": 7.8,
@@ -161,22 +168,25 @@
   "provenance": {
     "allin1": {
       "version": "unknown",
-      "raw_json": "tests/fixtures/allin1_sample.json",
-      "raw_sha256": "2ad0b3462f10eacbf004a6384dea027c08c90a9dab19c2a3fb9da2c471922d28"
+      "raw_json": "tests/fixtures/allin1_sample.json"
     },
     "essentia": {
       "version": "2.1-beta6-git",
       "profile": "profiles/essentia_v0_1.yaml",
-      "raw_json": "tests/fixtures/essentia_sample.json",
-      "raw_sha256": "2ce59450e0a2e4a6c8fab07491221306d704d7852898ec9d3b664e814f32a835",
-      "profile_sha256": "951db93fd9ec885c7d52206396359a26f5d1e29cb246b14f46ca8b3c5af9883b"
+      "raw_json": "tests/fixtures/essentia_sample.json"
     },
-    "created_at": "2026-08-23T00:00:00Z"
+    "basic_pitch": {
+      "enabled": false,
+      "version": null,
+      "note_events_csv": null
+    },
+    "created_at": "2026-08-22T16:43:14.228647+00:00"
   },
   "review": {
     "human_checked": false,
     "known_uncertainties": [
-      "Segment boundaries and key candidates require auditory verification."
+      "Segment boundaries and key candidates require auditory verification.",
+      "Symbolic transcription disabled by default for full mix."
     ]
   }
 }

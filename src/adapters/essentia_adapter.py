@@ -60,6 +60,10 @@ class EssentiaAdapter:
     def __init__(self, binary_path: Optional[str] = None):
         self.binary_path = binary_path or self.DEFAULT_BINARY
 
+    @staticmethod
+    def version() -> str:
+        return _essentia_version()
+
     def is_available(self) -> bool:
         """Check if essentia executable or python module is available."""
         if shutil.which(self.binary_path) is not None:

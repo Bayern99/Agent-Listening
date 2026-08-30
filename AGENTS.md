@@ -44,6 +44,11 @@ Single-context layout at repo root (`CONTEXT.md` and `docs/adr/`). See `docs/age
    - Every extractor parser and schema validator must have unit tests against fixture files (e.g. `tests/fixtures/`).
    - Red-Green-Refactor slices: test schema constraints and edge cases before writing mapping logic.
 
+5. **Installed CLI as the Integration Seam**:
+   - Downstream agents call the `agent-listening` console script installed from a pinned GitHub Release tag.
+   - `bin/agent-listening` is a contributor checkout wrapper, not the downstream installation contract.
+   - `--version`, mode-specific `doctor --json`, and installed-command smoke must remain lightweight and must not load models before analysis.
+
 ---
 
 ## Workspace Structure
@@ -54,6 +59,7 @@ Single-context layout at repo root (`CONTEXT.md` and `docs/adr/`). See `docs/age
 ├── README.md                         # Setup, commands, and current capability boundary
 ├── LICENSE / CREDITS.md               # Project license and third-party notices
 ├── pyproject.toml / uv.lock          # Python 3.11 dependency contract
+├── MANIFEST.in                       # sdist resource inclusion
 ├── CONTEXT.md                        # Ubiquitous domain glossary (no implementation noise)
 ├── docs/
 │   ├── adr/                          # Architectural Decision Records

@@ -13,13 +13,13 @@ JSON，不需要把源代码或逐帧数组塞进上下文。
 
 | 对象 | 稳定名称 | 含义 |
 | --- | --- | --- |
-| 项目 / lock metadata | `agent-listening-cli` | `pyproject.toml` 和 `uv.lock` 中的项目名；不代表已经发布 PyPI 包。 |
+| Distribution | `agent-listening-cli` | 可安装的 Python distribution 和 GitHub Release asset。 |
 | 可执行命令 | `agent-listening` | 正式支持的 CLI 调用界面。 |
 | Agent Skill | `agent-listening` | `.agents/skills/agent-listening/` 下的薄指令目录。 |
 
-因此可以重命名或 symlink checkout 目录而不破坏现有调用。正式集成界面是
-CLI；Skill 只是 CLI 的发现和 progressive disclosure 层，不需要配置 MCP
-server。
+因此可以重命名或 symlink checkout 目录而不破坏源码开发。正式集成界面是
+安装后的 CLI；Skill 只是 CLI 的发现和 progressive disclosure 层，不需要配置
+MCP server。
 
 ## 产品边界和特点
 
@@ -28,7 +28,7 @@ server。
 - 本地运行，不依赖云服务、账号或本地 Web server；
 - 使用确定性的 MIR extractor 生成声学和结构观察；
 - 分开保存 raw observation、normalized evidence 和 compact inference；
-- 默认 no-clobber，并以原子方式写入 artifacts；
+- 默认 no-clobber；完整 staging 后提交，普通提交异常会回滚；
 - 先生成机器可读 receipt，再按问题打开更深层的 artifact；
 - 所有事件带时间戳，人员可以在外部播放器或 DAW 中试听定位；
 - 不把自动生成的音符、调性、段落或 source separation 结果宣称为人工听觉
@@ -44,7 +44,7 @@ contours、note events 和 extractor payload 仍然保留，只有在确实需�
 音频文件
     │
     ▼
-bin/agent-listening ── locked uv environment ──► src.cli
+安装后的 `agent-listening` console script ──► src.cli
                                                      │
                                                      ▼
                                              src.core orchestrator
@@ -70,12 +70,15 @@ bin/agent-listening ── locked uv environment ──► src.cli
                                      thin Skill → downstream music agent
 ```
 
+`bin/agent-listening` 仍保留给仓库贡献者开发使用。下游项目调用安装后的
+console script，因此不依赖 Agent Listening checkout 在磁盘上的位置。
+
 实现分为四层：
 
 | 层 | 内容 | 主要位置 |
 | --- | --- | --- |
 | Observation | 工具原生的逐帧数组和模型输出 | `src/adapters/`、`raw/` |
-| Evidence | 时间网格、provenance、confidence、归一化事件 | `src/fusion/`、JAMS |
+| Evidence | 带时间戳的特征网格、provenance、confidence、归一化事件 | `src/fusion/`、JAMS |
 | Inference | 紧凑摘要和 capability status | `schemas/`、Music IR |
 | Execution | CLI 调用和 Agent handoff | `bin/`、`src/cli.py`、Skill |
 
@@ -104,23 +107,63 @@ bin/agent-listening ── locked uv environment ──► src.cli
 音频项目不需要复制 Agent Listening 源代码。保留一个权威 checkout，只向
 项目暴露它需要的 Skill 和/或 CLI wrapper。
 
-### 1. 准备权威 checkout
+### 1. 只安装一次 CLI
 
-在本仓库目录执行一次：
-
-```bash
-uv sync --locked
-```
-
-wrapper 会自行解析本 checkout，即使从其他工作目录调用也可以：
+计划中的 `v0.2.0` GitHub Release 是该版本的安装 authority。tag 发布后，将它
+安装到隔离的 tool 环境，并把稳定命令放入 `PATH`：
 
 ```bash
-"/absolute/path/to/Agent Listening/bin/agent-listening" --help
+uv tool install \
+  "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
+agent-listening --version
+agent-listening doctor --analysis-mode solo --json
 ```
 
-### 2. 选择 Skill 的作用范围
+如果没有 `uv`，使用兼容的 `pipx`：
 
-一个音频项目使用时，默认采用项目级 Skill：
+```bash
+pipx install \
+  "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
+```
+
+本版本不发布到 PyPI。为了可复现，不要直接安装未 pin 的 branch 或未经验证
+的 checkout。
+
+`doctor` 是快速安装检查：它检查 Python、必要的 package metadata、模块发现、
+打包后的 schema/profile 和输出目录可写性；不会下载模型权重，也不会运行音频
+推理。
+
+### 2. 按正确作用域安装 Skill
+
+CLI 和 Skill 分开安装。CLI 安装一次；Skill 安装到 Agent host 能发现的位置。
+
+只给一个音频项目使用时，在项目根目录执行：
+
+```bash
+gh skill install Bayern99/Agent-Listening-CLI \
+  .agents/skills/agent-listening/SKILL.md \
+  --allow-hidden-dirs \
+  --agent codex \
+  --scope project \
+  --pin v0.2.0
+```
+
+多个本地项目有意共享同一个 pinned Skill 时：
+
+```bash
+gh skill install Bayern99/Agent-Listening-CLI \
+  .agents/skills/agent-listening/SKILL.md \
+  --allow-hidden-dirs \
+  --agent codex \
+  --scope user \
+  --pin v0.2.0
+```
+
+`gh skill` 目前仍是 preview 命令。若当前 Agent host 不支持它，再使用 tagged
+checkout 的 symlink fallback。项目级适合明确归属和复现；user 级适合有意共享
+多个项目。不要把 Agent Listening 源代码复制进音频项目。
+
+一个项目的 symlink fallback：
 
 ```bash
 REPO="/absolute/path/to/Agent Listening"
@@ -134,41 +177,8 @@ ln -s "$REPO/.agents/skills/agent-listening" \
   "$AUDIO_PROJECT/.agents/skills/agent-listening"
 ```
 
-如果多个本地项目都应发现同一个 checkout 和同一个 Skill 版本，可以使用全局
-位置：
-
-```bash
-REPO="/absolute/path/to/Agent Listening"
-mkdir -p "$HOME/.agents/skills"
-test ! -e "$HOME/.agents/skills/agent-listening" || {
-  echo "destination already exists; inspect it before replacing" >&2
-  exit 1
-}
-ln -s "$REPO/.agents/skills/agent-listening" \
-  "$HOME/.agents/skills/agent-listening"
-```
-
-项目级适合需要明确归属和复现的单一项目；全局级只适合有意共享同一个本地
-authority 的情况。不要把源代码复制进每个音频项目；复制会造成版本漂移。只有
-在项目必须脱离该 checkout 独立携带时，才有理由做真正的 copy。
-
-### 3. 让 CLI 可被调用
-
-Skill 不会替代可执行命令。Agent 或脚本可以直接调用 wrapper，也可以把一个
-独立 symlink 放到 `PATH`：
-
-```bash
-REPO="/absolute/path/to/Agent Listening"
-mkdir -p "$HOME/.local/bin"
-test ! -e "$HOME/.local/bin/agent-listening" || {
-  echo "destination already exists; inspect it before replacing" >&2
-  exit 1
-}
-ln -s "$REPO/bin/agent-listening" "$HOME/.local/bin/agent-listening"
-```
-
-当前支持的是 checkout + `uv` 运行方式，不代表已经发布了 PyPI 包或系统级
-binary。
+checkout wrapper `bin/agent-listening` 只供仓库贡献者开发使用，不是下游项目的
+正常接入方式。
 
 ### 4. 把分析输出写入项目自己的目录
 
@@ -228,6 +238,23 @@ waveform/spectrum evidence，但不渲染 GUI、波形页面或 spectrogram 图�
 
 ## CLI 参考
 
+在昂贵的第一次运行前，或升级后，先检查安装环境：
+
+```bash
+agent-listening doctor --analysis-mode solo --json
+agent-listening doctor --analysis-mode full_mix --json
+```
+
+`doctor` 只有在所选 mode 的 package、executable、resource 和 output 检查都
+ready 时才返回 `0`。它不加载模型、不下载任何东西，也不证明感知正确性；
+`limitations` 字段会记录这些没有执行的检查。
+
+不导入分析依赖即可查看已安装 distribution 版本：
+
+```bash
+agent-listening --version
+```
+
 正式界面是：
 
 ```text
@@ -258,12 +285,13 @@ uv run --locked python -m src.cli build-ir \
   --json
 ```
 
-带 `--json` 的错误会以非零退出，并将 error receipt 写入 stderr。不要因为输出
+带 `--json` 的错误会以非零退出，并将唯一的 error receipt 写入 stdout；extractor
+进度和诊断信息仍写入 stderr。不要因为输出
 目录中有部分文件就把它当作成功分析。
 
 ## Artifact contract
 
-一次成功运行会在指定 output directory 下原子写入：
+一次成功运行会先完整 staging 当前 track 的 artifact 集合，再替换目标：
 
 ```text
 output/
@@ -292,14 +320,15 @@ material-change candidates 等摘要。完整 frame arrays 留在 JAMS/raw，不
 
 必须遵守的证据规则：
 
-- section acoustic summary 必须使用合法的局部时间网格；没有网格时字段为
+- section acoustic summary 必须使用合法的局部特征时间轴；没有时间轴时字段为
   `null`，不能拿全曲值复制冒充局部值；
 - material events 是带前后窗口的 machine candidates，不是人工标签；
 - 自动 note events 是 machine transcription，不是 score ground truth；
 - Basic Pitch amplitude/velocity 不是 loudness；
 - 弱的 key、beat 或 section 候选可以保留在 raw evidence 中，但不能升级成确定
   事实；
-- `review.human_checked` 在有人试听前必须保持 pending/false。
+- `review.human_checked` 在有人试听前必须保持 `false`；receipt 中的
+  `validation.human_listening` 保持 `pending`。
 
 ## 验证
 
@@ -311,12 +340,34 @@ uv run --locked python -m unittest discover -v
 uv run --locked python -m compileall -q src tests
 bin/agent-listening --help
 bin/agent-listening analyze --help
+uv build
 git diff --check
+```
+
+运行 `uv build` 后，还要在 checkout 之外验证真正的 distribution。CI 使用同样
+的顺序：把 wheel 安装到隔离环境，切换到临时目录，运行
+`agent-listening --version`、两个 mode 的 doctor，以及 installed
+`build-ir --json` fixture smoke。只在源码目录里运行 `python -m src.cli` 不算
+release installation 验证。
+
+如果当前环境已经同步好依赖，可以做本地 wheel smoke：
+
+```bash
+uv pip install --python .venv/bin/python --no-deps dist/*.whl
+SMOKE_DIR="$(mktemp -d)"
+(
+  cd "$SMOKE_DIR"
+  PATH="/absolute/path/to/Agent Listening/.venv/bin:$PATH" \
+    agent-listening --version
+  PATH="/absolute/path/to/Agent Listening/.venv/bin:$PATH" \
+    agent-listening doctor --analysis-mode solo --json
+)
 ```
 
 测试覆盖 adapter parsing、原生 timestamp grids、局部 section aggregation、
 material-event timing、mode routing、Basic Pitch preservation、Demucs manifest、
-schema compatibility、receipt/no-clobber 以及 atomic artifact。Music IR 使用
+schema compatibility、receipt/no-clobber，以及普通提交失败时的 staging/rollback。
+Music IR 使用
 Draft 2020-12 JSON Schema，JAMS 使用官方 base schema。如果 extractor 没有为每条
 observation 提供数字 confidence，不宣称 namespace-strict confidence validation
 已经通过。
@@ -377,12 +428,16 @@ Essentia 是 AGPL-licensed；all-in-one、Demucs 和 Basic Pitch 的模型权重
 
 影响当前边界的参考项目与运行依赖分开记录：soundscape-analyse 提供
 material-change review 思路，Ocean Listen 提供 separation-first/per-stem 思路，
-Mu2Mi 提供 compact representation 的产品比较；audioFlux 和 music21 已评估但
-没有加入。列出名称和链接不代表复制了它们的代码。
+Mu2Mi 提供 compact representation 的产品比较，OpenCLI 提供轻量 `doctor` 和
+structured envelope 的接入思路，CLI-Anything 提供 installed command 和真实
+artifact 验证清单。audioFlux 和 music21 已评估但没有加入。列出名称和链接不
+代表复制它们的代码；仓库没有复制上游 source tree 或 generated harness。
 
 MIT 文件只说明本项目代码的许可证，不意味着模型、输入录音或 transitive
-package 可以按 MIT 再分发。当前 checkout 已完成本地技术实现和测试，但没有因为
-存在 LICENSE 就自动形成公开 release、PyPI 发布或可再分发模型包。
+package 可以按 MIT 再分发。`v0.2.0` 计划通过 GitHub Release assets 发布；本版本
+不使用 PyPI 作为发布渠道。在 release 尚未创建前，请使用经过审查的 checkout 或
+维护者提供的精确 commit。release 创建后，安装 checkout 之外的版本时，应核对
+release commit 和附件 checksum。
 
 ## 明确不做的事情
 

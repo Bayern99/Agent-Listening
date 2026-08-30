@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -33,6 +34,20 @@ class TestMusicIRValidator(unittest.TestCase):
 
     def test_historical_v01_artifact_still_uses_legacy_schema(self):
         legacy_path = Path(__file__).parent.parent / "music-ir" / "demo-track-001.music-ir.json"
+        jams_path = Path(__file__).parent.parent / "jams" / "demo-track-001.analysis.jams"
+        def canonical_sha256(path):
+            value = json.loads(path.read_text(encoding="utf-8"))
+            canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            return hashlib.sha256(canonical.encode()).hexdigest()
+
+        self.assertEqual(
+            canonical_sha256(legacy_path),
+            "31052e62c0c314f2415e80fee40b67c0239d8e35567b7625de2c14e56ae83ed1",
+        )
+        self.assertEqual(
+            canonical_sha256(jams_path),
+            "dc98e3fdd97640a1d8f56981cd6e849b7fcf98832d27b0a56b888d1dcbfa7996",
+        )
         legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
         self.assertEqual(legacy["schema_version"], "music-ir/0.1")
         validate_music_ir(legacy)
@@ -86,6 +101,36 @@ class TestMusicIRValidator(unittest.TestCase):
     def test_unknown_top_level_field_fails(self):
         invalid = copy.deepcopy(self.valid_data)
         invalid["typo_field"] = True
+        with self.assertRaises(ValidationError):
+                validate_music_ir(invalid)
+
+    def test_missing_required_capability_fails(self):
+        invalid = copy.deepcopy(self.valid_data)
+        del invalid["capabilities"]["material_events"]
+        with self.assertRaises(ValidationError):
+            validate_music_ir(invalid)
+
+    def test_invalid_domain_status_fails(self):
+        invalid = copy.deepcopy(self.valid_data)
+        invalid["pitch"]["status"] = "banana"
+        with self.assertRaises(ValidationError):
+            validate_music_ir(invalid)
+
+    def test_empty_source_record_fails(self):
+        invalid = copy.deepcopy(self.valid_data)
+        invalid["sources"] = [{}]
+        with self.assertRaises(ValidationError):
+            validate_music_ir(invalid)
+
+    def test_incomplete_available_source_record_fails(self):
+        invalid = copy.deepcopy(self.valid_data)
+        invalid["sources"] = [{"id": "vocals", "status": "available"}]
+        with self.assertRaises(ValidationError):
+            validate_music_ir(invalid)
+
+    def test_invalid_extractor_run_status_fails(self):
+        invalid = copy.deepcopy(self.valid_data)
+        invalid["provenance"]["extractor_runs"][0]["status"] = "banana"
         with self.assertRaises(ValidationError):
             validate_music_ir(invalid)
 

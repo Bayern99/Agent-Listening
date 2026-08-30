@@ -30,6 +30,15 @@ class TestBasicPitchAdapter(unittest.TestCase):
         self.assertEqual(evidence["status"], "not_detected")
         self.assertIsNone(evidence["pitch_range_midi"])
 
+    def test_note_density_uses_the_complete_audio_duration(self):
+        evidence = BasicPitchAdapter.parse_note_events(
+            [(0.0, 1.0, 69, 0.8)],
+            tool_version="0.4.0",
+            duration_s=60.0,
+        )
+
+        self.assertAlmostEqual(evidence["note_density_per_s"], 0.0167, places=4)
+
     def test_empty_prediction_writes_no_optional_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("basic_pitch.inference.predict", return_value=(None, None, [])):
