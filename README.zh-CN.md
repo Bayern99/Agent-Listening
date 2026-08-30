@@ -7,6 +7,9 @@ Agent Listening CLI 是一个本地、确定性、artifact-first 的音频分析
 证据档案，以及保留下来的原始 extractor 输出。Agent 通常只需要读取小型
 JSON，不需要把源代码或逐帧数组塞进上下文。
 
+发布历史见 [CHANGELOG.md](CHANGELOG.md)；第三方依赖与致谢见
+[CREDITS.md](CREDITS.md)。
+
 ## 名称约定
 
 下面三个名称是有意分开的：

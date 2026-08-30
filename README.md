@@ -8,6 +8,9 @@ agents, a time-aligned JAMS evidence archive, and preserved raw extractor
 outputs. It is designed for an agent to call without filling its context with
 source code or large frame arrays.
 
+Release history: [CHANGELOG.md](CHANGELOG.md) · third-party notices:
+[CREDITS.md](CREDITS.md).
+
 The names are intentionally split:
 
 | Thing | Stable name | Meaning |
