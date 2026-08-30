@@ -143,7 +143,9 @@ it deliberately does not download model weights or run audio inference.
 ### 2. Install the Skill at the right scope
 
 The CLI and Skill are independent. Install the CLI once; install the Skill
-where the Agent host discovers it.
+where the Agent host discovers it. The reviewed Skill contract for the v0.2.0
+CLI is pinned to commit `4dfa5177b7ecd21dd8cbe5860f1ae37fb8f987c2` because
+the immutable v0.2.0 release tag predates that Skill-only revision.
 
 For one audio project, run this from the project root:
 
@@ -153,7 +155,7 @@ gh skill install Bayern99/Agent-Listening-CLI \
   --allow-hidden-dirs \
   --agent codex \
   --scope project \
-  --pin v0.2.0
+  --pin 4dfa5177b7ecd21dd8cbe5860f1ae37fb8f987c2
 ```
 
 For several local projects that should intentionally share one pinned Skill:
@@ -164,14 +166,14 @@ gh skill install Bayern99/Agent-Listening-CLI \
   --allow-hidden-dirs \
   --agent codex \
   --scope user \
-  --pin v0.2.0
+  --pin 4dfa5177b7ecd21dd8cbe5860f1ae37fb8f987c2
 ```
 
 `gh skill` is currently a preview command. If the host does not support it,
-use a symlink to the tagged checkout as the fallback. Project scope is the
-default for explicit ownership and reproducibility; user scope is for deliberate
-multi-project discovery. Never copy the Agent Listening source tree into an
-audio project.
+use a symlink to a checkout containing the same reviewed Skill commit as the
+fallback. Project scope is the default for explicit ownership and
+reproducibility; user scope is for deliberate multi-project discovery. Never
+copy the Agent Listening source tree into an audio project.
 
 Fallback symlink for one project:
 
