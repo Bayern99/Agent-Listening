@@ -1,27 +1,60 @@
 ---
 name: agent-listening
-description: Use when an agent needs to analyze finished audio into compact Music IR, JAMS timing evidence, or optional stem/note artifacts with the local CLI.
+description: Analyze rendered or finished audio with the installed agent-listening CLI into compact Music IR, JAMS timing evidence, and optional stem or note artifacts. Use for machine-readable evidence from an audio file; not for audio generation, editing, or live monitoring.
 ---
 
 # Agent Listening
 
-The distribution is `agent-listening-cli`; the stable executable and Skill name
-are both `agent-listening`. For v0.2.0, install the CLI from the pinned GitHub
-Release tag; the Skill is installed separately at project or user scope.
+Use the installed `agent-listening` command as the only integration surface.
+Do not import repository internals, invoke the contributor checkout wrapper, or
+load source code and frame arrays into the agent context.
 
-The v0.2.0 environment requires CPython 3.11. Basic Pitch 0.4.0 does not have
-a compatible TensorFlow macOS wheel for CPython 3.13, so always select the
-3.11 interpreter explicitly.
+## Runtime contract
 
-Use the installed CLI as the only integration surface:
+This Skill targets `agent-listening-cli` v0.2.0 on CPython 3.11. First check the
+command and version:
 
 ```bash
-uv tool install --python 3.11 "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
+command -v agent-listening
 agent-listening --version
+```
+
+If the command is missing, the version is not `agent-listening 0.2.0`, or
+`doctor` is unavailable, install the pinned release. Do not reinstall on every
+invocation.
+
+```bash
+uv tool install --python 3.11 --force \
+  "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0" &&
+hash -r &&
+agent-listening --version &&
 agent-listening doctor --analysis-mode solo --json
 ```
 
-Then run an analysis:
+If installation, version verification, or `doctor` fails, stop and report the
+error. Do not fall through to another same-named executable already on `PATH`.
+The binary help is the versioned command contract; run
+`agent-listening --help` or `agent-listening <command> --help` instead of
+guessing flags.
+
+## Choose the analysis mode
+
+- `solo`: one isolated voice or instrument; runs acoustic evidence, continuous
+  pitch, and Basic Pitch notes/MIDI.
+- `stem`: an already-isolated source supplied by the caller; runs the same
+  pitch/note path as `solo`. The CLI records `analysis_mode=stem` but does not
+  accept or infer a richer caller-supplied source role.
+- `full_mix`: a finished mix; runs full-mix evidence, all-in-one, Demucs
+  `htdemucs_6s`, and per-stem analysis. It is slower, may download model
+  weights, and does not run Basic Pitch on `drums`.
+
+Choose from the actual input; do not use `full_mix` merely because it is the CLI
+default. Before an expensive first analysis, run `doctor --json` with the same
+`solo`, `stem`, or `full_mix` mode you selected.
+
+## Analyze
+
+Use absolute paths, a fresh job output directory, and structured output:
 
 ```bash
 agent-listening analyze "/absolute/path/to/audio.wav" \
@@ -30,74 +63,31 @@ agent-listening analyze "/absolute/path/to/audio.wav" \
   --json
 ```
 
-Choose the mode from the actual input:
+Existing artifacts are no-clobber by default. On `FileExistsError`, inspect the
+existing output or choose a new directory. Use `--overwrite` only when the user
+has explicitly authorized replacing that track's existing JAMS, Music IR, raw,
+stem, and symbol artifacts.
 
-- `solo`: one isolated vocal/instrument file; runs Essentia pitch and Basic
-  Pitch notes/MIDI in addition to acoustic evidence.
-- `stem`: a caller-provided stem; same analyzers as `solo`, with the caller's
-  source identity.
-- `full_mix`: a finished mix; runs all-in-one and Demucs `htdemucs_6s`, then
-  per-stem activity/pitch/notes. Do not run Basic Pitch on `drums`.
+## Read the result
 
-The Skill is deliberately thin. Do not read the repository source, raw JSON,
-or all frame arrays into the agent context before running the command. Do not
-start a server, call an MCP endpoint, render a GUI, or invent a second adapter.
+Require both exit code `0` and `receipt.status == "success"`. On a nonzero exit,
+parse the JSON error receipt from stdout and stop. Extractor chatter belongs on
+stderr and is not the receipt.
 
-Read the machine-readable receipt first. It contains absolute artifact paths,
-capability statuses, validation state, and the progressive-disclosure order:
+Follow `receipt.next` and open only artifact paths listed by the receipt. Usually
+this means compact Music IR first, JAMS for timing or candidates, symbols/stems
+when available, and raw evidence only for provenance or diagnosis. Never load
+large frame arrays by default.
 
-1. receipt;
-2. `music-ir/<track>.music-ir.json` for ordinary reasoning;
-3. `jams/<track>.analysis.jams` for timing, candidates, frame vectors, and
-   material-event timestamps;
-4. `symbols/` or `stems/` only when the receipt says those capabilities are
-   available;
-5. `raw/` only for provenance or diagnosis.
+Interpret capability values literally:
 
-Open a timestamp in an external player or DAW when a person needs to audition
-the corresponding passage. Numeric waveform/spectrum evidence is retained in
-JAMS/raw, but this tool does not produce plots or interactive pages.
+- `available`: evidence exists and may be read;
+- `not_applicable`: the mode does not use that capability;
+- `not_detected`: the extractor ran but did not publish usable evidence;
+- `failed`: that extractor failed; preserve and use other successful evidence.
 
-Execution success means machine extraction, artifact persistence, and schema
-validation completed. It does not mean a human has confirmed sections, key,
-source separation, or automatic transcription. Machine note events are not
-score ground truth, and Basic Pitch amplitude is never loudness.
-
-`doctor` is a preflight check only: it verifies Python, package metadata,
-module discovery, packaged resources, and output writability. It does not load
-model weights, run audio inference, or perform human listening.
-
-## Installation scope
-
-Install this Skill as a symlink so the checkout remains the one authority.
-For one audio project:
-
-```bash
-mkdir -p "/absolute/path/to/audio-project/.agents/skills"
-ln -s "/absolute/path/to/Agent Listening/.agents/skills/agent-listening" \
-  "/absolute/path/to/audio-project/.agents/skills/agent-listening"
-```
-
-When the host supports `gh skill`, a pinned project install is preferable:
-
-```bash
-gh skill install Bayern99/Agent-Listening-CLI \
-  .agents/skills/agent-listening/SKILL.md \
-  --allow-hidden-dirs --agent codex --scope project --pin v0.2.0
-```
-
-For several local projects, use the global discovery location instead:
-
-```bash
-mkdir -p "$HOME/.agents/skills"
-ln -s "/absolute/path/to/Agent Listening/.agents/skills/agent-listening" \
-  "$HOME/.agents/skills/agent-listening"
-```
-
-For a shared user-level Skill, use `--scope user` or the equivalent symlink
-under `$HOME/.agents/skills`. Do not copy the Agent Listening source tree into
-an audio project. The checkout wrapper `bin/agent-listening` is contributor
-convenience only; downstream agents should call the installed console script.
-Inspect existing destinations before replacing them. Project-local scope is the
-default recommendation; user scope is only for deliberate multi-project
-discovery.
+Execution and schema validation are not human listening approval. Sections,
+key, separation, and automatic transcription remain machine evidence until a
+person reviews them. Note events are not score ground truth, and Basic Pitch
+amplitude is not loudness. Use timestamps in an external player or DAW when
+human audition is needed; do not start a GUI, Web server, or MCP service.
