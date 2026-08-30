@@ -111,9 +111,9 @@ needs.
 
 ### 1. Install the CLI once
 
-The planned `v0.2.0` GitHub Release is the installation authority for this
-version. Once that tag is published, install it into an isolated tool
-environment and expose the stable command on `PATH`:
+The published [`v0.2.0` GitHub Release](https://github.com/Bayern99/Agent-Listening-CLI/releases/tag/v0.2.0)
+is the installation authority for this version. Install it into an isolated
+tool environment and expose the stable command on `PATH`:
 
 ```bash
 uv tool install \
@@ -454,11 +454,9 @@ no source tree or generated harness is copied.
 
 The MIT file makes the project terms explicit; it does not mean that a model,
 input recording, or transitive package can be redistributed under MIT. The
-`v0.2.0` distribution is intended to ship through GitHub Release assets; PyPI
-is not a release channel for this version. Until that release exists, use a
-reviewed checkout or the exact commit supplied by the maintainer. Once
-published, check the exact release commit and attached checksums when
-installing outside this repository.
+`v0.2.0` distribution is published through GitHub Release assets; PyPI is not
+a release channel for this version. When installing outside this repository,
+check the exact release commit and attached checksums.
 
 ## Deliberate non-goals
 
