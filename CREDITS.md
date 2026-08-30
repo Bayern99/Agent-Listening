@@ -77,11 +77,10 @@ text is in [`LICENSE`](LICENSE). Third-party notices do not grant a license to
 redistribute or relicense any dependency or model. Review each upstream code,
 model-weight, and input-audio term before redistribution or hosted use.
 
-The planned `v0.2.0` release will be distributed through GitHub Release assets
-and a pinned Git URL; PyPI is intentionally not a release channel for this
-version. Until that release is created, this checkout is the technical source
-and no public release is claimed. A GitHub Release does not relicense model
-weights, input recordings, or transitive packages.
+The [`v0.2.0` release](https://github.com/Bayern99/Agent-Listening-CLI/releases/tag/v0.2.0)
+is published through GitHub Release assets and a pinned Git URL; PyPI is
+intentionally not a release channel for this version. The release does not
+relicense model weights, input recordings, or transitive packages.
 
 For model-specific terms, consult the upstream weight/release notices before
 redistribution: [All-In-One releases](https://github.com/openmirlab/all-in-one-infer/releases),

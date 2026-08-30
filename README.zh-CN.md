@@ -109,8 +109,9 @@ console script，因此不依赖 Agent Listening checkout 在磁盘上的位置�
 
 ### 1. 只安装一次 CLI
 
-计划中的 `v0.2.0` GitHub Release 是该版本的安装 authority。tag 发布后，将它
-安装到隔离的 tool 环境，并把稳定命令放入 `PATH`：
+已经发布的 [`v0.2.0` GitHub Release](https://github.com/Bayern99/Agent-Listening-CLI/releases/tag/v0.2.0)
+是该版本的安装 authority。将它安装到隔离的 tool 环境，并把稳定命令放入
+`PATH`：
 
 ```bash
 uv tool install \
@@ -434,10 +435,9 @@ artifact 验证清单。audioFlux 和 music21 已评估但没有加入。列出�
 代表复制它们的代码；仓库没有复制上游 source tree 或 generated harness。
 
 MIT 文件只说明本项目代码的许可证，不意味着模型、输入录音或 transitive
-package 可以按 MIT 再分发。`v0.2.0` 计划通过 GitHub Release assets 发布；本版本
-不使用 PyPI 作为发布渠道。在 release 尚未创建前，请使用经过审查的 checkout 或
-维护者提供的精确 commit。release 创建后，安装 checkout 之外的版本时，应核对
-release commit 和附件 checksum。
+package 可以按 MIT 再分发。`v0.2.0` 已通过 GitHub Release assets 发布；本版本
+不使用 PyPI 作为发布渠道。在仓库外安装时，应核对 release commit 和附件
+checksum。
 
 ## 明确不做的事情
 
