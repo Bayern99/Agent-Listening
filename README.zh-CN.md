@@ -113,8 +113,12 @@ console script，因此不依赖 Agent Listening checkout 在磁盘上的位置�
 是该版本的安装 authority。将它安装到隔离的 tool 环境，并把稳定命令放入
 `PATH`：
 
+`v0.2.0` 要求 CPython 3.11。这是有意的：Basic Pitch 0.4.0 在 macOS 上没有
+适用于 CPython 3.13 的兼容 TensorFlow wheel。显式指定 `--python` 也可以避免
+`uv` 按当前不兼容的系统 Python 解析依赖。
+
 ```bash
-uv tool install \
+uv tool install --python 3.11 \
   "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
 agent-listening --version
 agent-listening doctor --analysis-mode solo --json
@@ -123,7 +127,7 @@ agent-listening doctor --analysis-mode solo --json
 如果没有 `uv`，使用兼容的 `pipx`：
 
 ```bash
-pipx install \
+pipx install --python python3.11 \
   "git+https://github.com/Bayern99/Agent-Listening-CLI.git@v0.2.0"
 ```
 
